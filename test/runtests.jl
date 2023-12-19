@@ -1,5 +1,6 @@
 using IterativeLearningControl
 using ControlSystemsBase, LinearAlgebra
+using Plots
 using Test
 
 
@@ -31,7 +32,6 @@ end
 
 @testset "IterativeLearningControl.jl" begin
 
-
     # Continuous
     G    = double_mass_model(Jl = 1)
     Gact = double_mass_model(Jl = 1.5) # 50% more load than modeled
@@ -62,10 +62,12 @@ end
     prob = ILCProblem(r, simact)
     alg1 = HeuristicILC(Q, L, t)
     alg2 = OptimizationILC(Gu; N, ρ=0.00001, λ=0.0001)
-    Y1, E1, A1 = ilc(prob, alg1)
-    Y2, E2, A2 = ilc(prob, alg2)
+    sol1 = ilc(prob, alg1)
+    sol2 = ilc(prob, alg2)
 
-    @test all(diff(norm.(E1)) .< 0)
-    @test all(diff(norm.(E2)) .< 0)
-    @test all(norm.(E2) .<= norm.(E1))
+    @test all(diff(norm.(sol1.E)) .< 0)
+    @test all(diff(norm.(sol2.E)) .< 0)
+    @test all(norm.(sol2.E) .<= norm.(sol2.E))
+
+    plot(sol1)
 end
