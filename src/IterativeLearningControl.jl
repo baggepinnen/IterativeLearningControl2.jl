@@ -3,7 +3,8 @@ using ControlSystemsBase, RecipesBase, LinearAlgebra
 
 export ilc,
     OptimizationILC, HeuristicILC,
-    ILCProblem
+    ILCProblem,
+    ilc_theorem
 
 
 function lsim_zerophase(G, u, args...; kwargs...)
@@ -54,13 +55,50 @@ end
 simulate(prob, alg, a) = prob.sim(prob.r, a)
 
 abstract type ILCAlgorithm end
-struct HeuristicILC <: ILCAlgorithm
+
+"""
+    HeuristicILC
+
+Apply the learning rule
+
+```math
+\\begin{aligned}
+y_k(t) &= G(q) \\big(r(t) + a_k(t) \\big) \\\\
+e_k(t) &= r(t) - y_k(t) \\\\
+a_k(t) &= Q(q) \\big( a_{k-1}(t) + L(q) e_{k-1}(t) \\big)
+\\end{aligned}
+```
+
+A theorem due to Norrlöf says that for this ILC iterations to converge, one needs to satisfy
+$$| 1 - LG | < |Q^{-1}|$$
+which we can verify by looking at the Bode curves of the two sides of the inequality
+```@example ilc
+bodeplot([inv(Q), (1 - L*Gc)], plotphase=false, lab=["Stability boundary \$Q^{-1}\$" "\$1 - LG\$"])
+bodeplot!((1 - L*Gcact), plotphase=false, lab="\$1 - LG\$ actual")
+```
+This plot can be constructed using the [`ilc_theorem`](@ref) function.
+
+# Fields:
+- `Q`: Robustness filter
+- `L`: Learning filter
+- `t`: Time vector
+"""
+@kwdef struct HeuristicILC <: ILCAlgorithm
     Q
     L
     t
+    location::Symbol = :ref
 end
 
-simulate(prob, alg::HeuristicILC, a) = prob.sim(prob.r+a, zero(a))
+function simulate(prob, alg::HeuristicILC, a)
+    if alg.location === :ref
+        prob.sim(prob.r+a, zero(a))
+    elseif alg.location === :input
+        prob.sim(prob.r, a)
+    else
+        error("Unknown location: $(alg.location)")
+    end
+end
 
 function compute_input(alg::HeuristicILC, a, e)
     (; Q, L, t) = alg
@@ -102,25 +140,18 @@ end
 function ilc(prob, alg; iters = 5)
     r = prob.r
     a = zero(r) # ILC adjustment signal starts at 0
-    # fig1 = plot(t, vec(r), sp=1, layout=(3,1), l=(:black, 3), lab="Ref")
-    # fig2 = plot(title="Sum of squared error", xlabel="Iteration", legend=false, titlefontsize=10, framestyle=:zerolines, ylims=(0, 7.1))
-    Y = []
-    E = []
-    A = []
+    Y = typeof(r)[]
+    E = typeof(r)[]
+    A = typeof(r)[]
     for iter = 1:iters
-        res = simulate(prob, alg, a)         # System response
+        res = simulate(prob, alg, a)
         y = res.y
-        e = r .- y            # Error
+        e = r .- y
         a = compute_input(alg, a, e)
-        err = sum(abs2, e)
-        # plot!(fig1, res, plotu=true, sp=[1 2 2], title=["Output \$y(t)\$" "Feedforward \$a\$"], lab="Iter $iter", c=iter)
-        # plot!(fig1, res.t, e[:], sp=3, title="Tracking error \$e(t)\$", lab="err: $(round(err, digits=2))", c=iter)
-        # scatter!(fig2, [iter], [err])
         push!(Y, y)
         push!(E, e)
         push!(A, a)
     end
-    # plot(fig1, fig2, layout=@layout([a{0.7w} b{0.3w}]))
     ILCSolution(Y,E,A,prob,alg)
 end
 
@@ -155,11 +186,31 @@ end
         title --> "Tracking RMS"
         legend --> false
         sp --> 4
+        framestyle --> :zerolines
         rmses
     end
 
+end
 
+"""
+    ilc_theorem(alg::HeuristicILC, Gc, Gcact = nothing)
 
+Plot the stability boundary for the ILC algorithm.
+
+# Arguments:
+- `alg`: Containing the filters ``Q`` and ``L``
+- `Gc`: The closed-loop system from ILC signal to output. If `alg.location = :ref`, this is typically given by `feedback(P*C)` while if `alg.location = :input`, this is typically given by `feedback(P, C)`.
+- `Gcact`: If provided, this is the "actual" closed-loop system which may be constructed using a different plant model than `Gc`. This is useful when trying to determine if the filter choises will lead to a robust ILC algorithm. `Gc` may be constructed using, e.g., uncertain parameters, see https://juliacontrol.github.io/RobustAndOptimalControl.jl/dev/uncertainty/ for more details.
+"""
+function ilc_theorem(alg::HeuristicILC, Gc, Gcact=nothing)
+    (; L, Q) = alg
+    fig = bodeplot([inv(Q), (1 - L*Gc)], plotphase=false, lab=["Stability boundary \$Q^{-1}\$" "\$1 - LG\$"], c=[:black 1], linestyle=[:dash :solid])
+    fig2 = nyquistplot(Q*(1 - L*Gc), unit_circle=true, lab="\$Q(1 - LG)\$")
+    if Gcact !== nothing
+        bodeplot!(fig, (1 - L*Gcact), plotphase=false, lab="\$1 - LG\$ actual", c=2)
+        nyquistplot!(fig2, Q*(1 - L*Gcact), lab="\$Q(1 - LG)\$ actual")
+    end    
+    RecipesBase.plot(fig, fig2)
 end
 
 

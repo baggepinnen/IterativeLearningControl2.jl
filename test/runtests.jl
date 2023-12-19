@@ -55,19 +55,26 @@ end
     r = funnysin.(t)' |> Array # Reference signal
     N = length(r)
     
-    Q = c2d(tf(1, [0.05, 1]), Ts)
+    Q1 = c2d(tf(1, [0.05, 1]), Ts)
+    Q3 = c2d(tf(1, [0.1, 1]), Ts)
     # L = 0.9z^1 # A more conservative and heuristic choice
-    L = 0.5inv(Gr) # Make the scaling factor smaller to take smaller steps
+    L1 = 0.5inv(Gr) # Make the scaling factor smaller to take smaller steps
+    L3 = 0.5inv(tf(Gu))
 
     prob = ILCProblem(r, simact)
-    alg1 = HeuristicILC(Q, L, t)
+    alg1 = HeuristicILC(Q1, L1, t, :ref)
     alg2 = OptimizationILC(Gu; N, ρ=0.00001, λ=0.0001)
+    alg3 = HeuristicILC(Q3, L3, t, :input)
     sol1 = ilc(prob, alg1)
     sol2 = ilc(prob, alg2)
+    sol3 = ilc(prob, alg3)
 
     @test all(diff(norm.(sol1.E)) .< 0)
     @test all(diff(norm.(sol2.E)) .< 0)
+    @test all(diff(norm.(sol3.E)) .< 0)
     @test all(norm.(sol2.E) .<= norm.(sol2.E))
 
     plot(sol1)
+
+    ilc_theorem(alg1, Gr, tf(Gract))
 end
