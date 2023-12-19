@@ -1,0 +1,13 @@
+name = "IterativeLearningControl"
+uuid = "528a9aa3-4044-4660-82a5-c2ef7f1e15dc"
+authors = ["Fredrik Bagge Carlson"]
+version = "1.0.0-DEV"
+
+[compat]
+julia = "1.9"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
