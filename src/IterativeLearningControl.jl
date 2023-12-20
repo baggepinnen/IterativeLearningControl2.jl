@@ -107,8 +107,6 @@ function ILCProblem(; r, Gr=nothing, Gu=nothing, P=nothing, C=nothing)
     else
         error("Either (Gr, Gu) or (P, C) must be provided")
     end
-    N = size(r, 2)
-    # t = range(0, step=Gr.Ts, length=N)
     isdiscrete(Gr) && isdiscrete(Gu) || error("Gr and Gu must be discrete-time transfer functions. Continuous-time transfer function can be discretized using the function c2d.")
     ILCProblem(r, Gr, Gu)
 end
@@ -319,15 +317,15 @@ end
 """
     ConstrainedILC
 
-Constrained ILC algorithm from the paper
+Constrained ILC algorithm from the paper "On Robustness in Optimization-Based Constrained Iterative Learning Control", Liao-McPherson and friends.
 
-"On Robustness in Optimization-Based Constrained Iterative Learning Control", Liao-McPherson and friends.
+Supports MIMO systems.
 
 # Fields:
 - `Q`: Error penalty matrix, e.g., `Q = I(ny)`
 - `R`: Feedforward penalty matrix, e.g., `R = I(nu)`
-- `U`: A function of `(model, a)` that adds constraints to the optimization problem. `a` is a vector of optimization variables that determines the optimized ILC input. See example below. 
-- `Y`: A function of `(model, yh)` that adds constraints to the optimization problem. `yh` is a matrix of predicted plant outputs. See example below
+- `U`: A function of `(model, a)` that adds constraints to the optimization problem. `a` is a size `(nu, N)` matrix of optimization variables that determines the optimized ILC input. See example below. 
+- `Y`: A function of `(model, yh)` that adds constraints to the optimization problem. `yh` is a size `(ny, N)` matrix of predicted plant outputs. See example below
 - `opt`: A JuMP-compatible optimizer, e.g., `OSQP.Optimizer`
 - `α`: Step size, should be smaller than 2. Smaller step sizes lead to more robust progress but slower convergence. Use a small stp size if the model is highly uncertain.
 - `verbose`: If `true`, print solver output
@@ -336,6 +334,10 @@ Constrained ILC algorithm from the paper
 
 # Example
 ```
+using IterativeLearningControl, OSQP, JuMP, ControlSystemsBase
+
+# Define Gr and Gu
+
 Q = 1000I(Gr.ny)
 R = 0.001I(Gu.nu)
 
@@ -349,7 +351,7 @@ Y = function (model, yh) # Constrain the predicted output to the range [-1.1, 1.
     JuMP.@constraint(model, [i=1:size(yh, 2)], l .<= yh[:, i] .<= u)
 end
 
-alg2 = ConstrainedILC(; Q, R, U, Y, opt=OSQP.Optimizer, verbose=true, α=1)
+alg = ConstrainedILC(; Q, R, U, Y, opt=OSQP.Optimizer, verbose=true, α=1)
 ```
 
 To constrain the total plant input, i.e., the sum of the ILC feedforward and the output of the feedback controller, add outputs corresponding to this signal to the models `Gr, Gu`, for example
