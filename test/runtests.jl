@@ -3,6 +3,7 @@ using ControlSystemsBase, LinearAlgebra
 using Plots
 using Test
 
+using JuMP, BlockArrays, Ipopt
 
 function double_mass_model(; 
     Jm = 1,   # motor inertia
@@ -41,6 +42,17 @@ end
         OP = IterativeLearningControl.hankel_operator(G, N)
         y = lsim(G, u).y
         y2 = (OP*u')'
+        @test y ≈ y2
+    end
+
+    @testset "mv hankel operator" begin
+        @info "Testing mv hankel operator"
+        G = ssrand(2,3,5,Ts=1)
+        N = 12
+        u = randn(G.nu, N)
+        OP = IterativeLearningControl.mv_hankel_operator(G, N)
+        y = lsim(G, u).y
+        y2 = reshape((OP*vec(u')), :, G.ny)'
         @test y ≈ y2
     end
 
@@ -91,4 +103,44 @@ end
     plot(sol1)
 
     ilc_theorem(alg1, Gr, tf(Gract))
+
+
+    ## Test ConstrainedILC with hard step reference
+    Q1 = c2d(tf(1, [0.2, 1]), Ts)
+    L1 = 0.7inv(tf(Gu))
+    r = sign.(funnysin.(t)')
+    prob = ILCProblem(; r, Gr, Gu)
+    actual = ILCProblem(; r, Gr=Gract, Gu=Guact)
+    alg1 = HeuristicILC(Q1, L1, :input)
+    sol1 = ilc(prob, alg1; actual)
+    plot(sol1)
+    
+    ##
+    
+    
+    Q = 1000I(Gr.ny)
+    R = 0.001I(Gu.nu)
+    
+    U = function (model, v)
+        l,u = (-25ones(Gu.nu), 25ones(Gu.nu))
+        JuMP.@constraint(model, [i=1:size(v, 2)], l .<= v[:, i] .<= u)
+    end
+    
+    Y = function (model, yh)
+        l,u = -1.1ones(Gr.ny), 1.1ones(Gr.ny)
+        JuMP.@constraint(model, [i=1:size(yh, 2)], l .<= yh[:, i] .<= u)
+    end
+    
+    alg2 = ConstrainedILC(; Q, R, U, Y, opt=Ipopt.Optimizer, verbose=true, α=1)
+    sol2 = ilc(prob, alg2)
+    plot(sol2)
+    ##
+    
+    @test all(diff(norm.(sol1.E)) .< 0)
+    @test all(diff(norm.(sol2.E)) .< 0)
+
+    @test norm(sol2.E[end]) ≈ 4.4544077312015835 atol = 1e-1
 end
+
+
+

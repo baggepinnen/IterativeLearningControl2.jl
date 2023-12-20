@@ -2,7 +2,7 @@ module IterativeLearningControl
 using ControlSystemsBase, RecipesBase, LinearAlgebra
 
 export ilc,
-    OptimizationILC, HeuristicILC,
+    OptimizationILC, HeuristicILC, ConstrainedILC,
     ILCProblem,
     init, compute_input,
     ilc_theorem
@@ -38,7 +38,7 @@ end
 """
     hankel(sys::LTISystem{<:Discrete}, N::Int)
 
-Return a matrix operator ``H`` such that ``Hu^T = y^T`` where `y = lsim(H, u)`. ``H`` is a Hankel matrix containing the Markov parameters of the system (scaled impulse response).
+Return a matrix operator ``H`` such that ``Hu^T = y^T`` where `y = lsim(sys, u)`. ``H`` is a Hankel matrix containing the Markov parameters of the system (scaled impulse response).
 """
 function hankel_operator(sys::LTISystem{<:Discrete}, N::Int)
     ControlSystemsBase.issiso(sys) || error("System must be SISO")
@@ -307,6 +307,46 @@ function ilc_theorem(alg::HeuristicILC, Gc, Gcact=nothing)
     end    
     RecipesBase.plot(fig, fig2)
 end
+
+
+
+
+## Mv stuff
+
+
+
+
+@kwdef struct ConstrainedILC <: ILCAlgorithm
+    Q
+    R
+    U
+    Y
+    α = nothing
+    verbose = false
+    opt
+end
+
+
+# function ΠWX(W, X, x)
+#     l, u = X
+#     # argmin_{v ∈ X} ||v-x||_W^2
+#     opt = Ipopt.Optimizer
+#     model = JuMP.Model(opt)
+#     JuMP.@variable(model, l[i] <= v[i=1:size(x,1), j=1:size(x,2)]<= u[i])
+#     e = v .- x
+#     JuMP.@objective(model, Min, dot(e, W, e))
+#     JuMP.optimize!(model)
+#     JuMP.value.(v)
+# end
+
+hv(x) = vec(x')
+
+"""
+    mv_hankel_operator(sys::LTISystem{<:Discrete}, N::Int)
+
+Return a matrix operator ``H`` such that `y == reshape(H*vec(u'), :, sys.ny)'` where `y = lsim(sys, u)`. ``H`` is a block Hankel matrix containing the Markov parameters of the system (scaled impulse response).
+"""
+function mv_hankel_operator end
 
 
 end
