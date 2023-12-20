@@ -229,7 +229,7 @@ To simulate the effect of plat-model mismatch, one may provide a different insta
 function ilc(prob, alg; iters = 5, actual = prob)
     workspace = init(prob, alg)
     r = prob.r
-    a = zero(r) # ILC adjustment signal starts at 0
+    a = zeros(size(prob.Gu, 2), size(r, 2)) # ILC adjustment signal starts at 0
     Y = typeof(r)[]
     E = typeof(r)[]
     A = typeof(r)[]
@@ -316,11 +316,56 @@ end
 
 
 
+"""
+    ConstrainedILC
+
+Constrained ILC algorithm from the paper
+
+"On Robustness in Optimization-Based Constrained Iterative Learning Control", Liao-McPherson and friends.
+
+# Fields:
+- `Q`: Error penalty matrix, e.g., `Q = I(ny)`
+- `R`: Feedforward penalty matrix, e.g., `R = I(nu)`
+- `U`: A function of `(model, a)` that adds constraints to the optimization problem. `a` is a vector of optimization variables that determines the optimized ILC input. See example below. 
+- `Y`: A function of `(model, yh)` that adds constraints to the optimization problem. `yh` is a matrix of predicted plant outputs. See example below
+- `opt`: A JuMP-compatible optimizer, e.g., `OSQP.Optimizer`
+- `α`: Step size, should be smaller than 2. Smaller step sizes lead to more robust progress but slower convergence. Use a small stp size if the model is highly uncertain.
+- `verbose`: If `true`, print solver output
+- `Gr_constraints`: If provided, this is the closed-loop transfer function from reference to constrained outputs. If not provided, the constrained outputs are assumed to be equal to the plant outputs.
+- `Gu_constraints`: If provided, this is the closed-loop transfer function from plant input to constrained outputs. If not provided, the constrained outputs are assumed to be equal to the plant outputs.
+
+# Example
+```
+Q = 1000I(Gr.ny)
+R = 0.001I(Gu.nu)
+
+U = function (model, a) # Constrain the ILC input to the range [-25, 25]
+    l,u = (-25ones(Gu.nu), 25ones(Gu.nu))
+    JuMP.@constraint(model, [i=1:size(a, 2)], l .<= a[:, i] .<= u)
+end
+
+Y = function (model, yh) # Constrain the predicted output to the range [-1.1, 1.1]
+    l,u = -1.1ones(Gr.ny), 1.1ones(Gr.ny)
+    JuMP.@constraint(model, [i=1:size(yh, 2)], l .<= yh[:, i] .<= u)
+end
+
+alg2 = ConstrainedILC(; Q, R, U, Y, opt=OSQP.Optimizer, verbose=true, α=1)
+```
+
+To constrain the total plant input, i.e., the sum of the ILC feedforward and the output of the feedback controller, add outputs corresponding to this signal to the models `Gr, Gu`, for example
+```
+Gr_constraints = [Gr; feedback(C, P)]
+Gu_constraints = [Gu; feedback(1, C*P)]
+```
+and constrain this output in the function `Y` above.
+"""
 @kwdef struct ConstrainedILC <: ILCAlgorithm
     Q
     R
-    U
-    Y
+    U = nothing
+    Y = nothing
+    Gr_constraints = nothing
+    Gu_constraints = nothing
     α = nothing
     verbose = false
     opt
@@ -330,7 +375,7 @@ end
 # function ΠWX(W, X, x)
 #     l, u = X
 #     # argmin_{v ∈ X} ||v-x||_W^2
-#     opt = Ipopt.Optimizer
+#     opt = OSQP.Optimizer
 #     model = JuMP.Model(opt)
 #     JuMP.@variable(model, l[i] <= v[i=1:size(x,1), j=1:size(x,2)]<= u[i])
 #     e = v .- x

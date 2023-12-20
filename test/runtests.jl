@@ -3,7 +3,7 @@ using ControlSystemsBase, LinearAlgebra
 using Plots
 using Test
 
-using JuMP, BlockArrays, Ipopt
+using JuMP, BlockArrays, OSQP
 
 function double_mass_model(; 
     Jm = 1,   # motor inertia
@@ -131,16 +131,64 @@ end
         JuMP.@constraint(model, [i=1:size(yh, 2)], l .<= yh[:, i] .<= u)
     end
     
-    alg2 = ConstrainedILC(; Q, R, U, Y, opt=Ipopt.Optimizer, verbose=true, α=1)
+    alg2 = ConstrainedILC(; Q, R, U, Y, opt=OSQP.Optimizer, verbose=true, α=1)
     sol2 = ilc(prob, alg2)
     plot(sol2)
-    ##
+    ## Look at the total plant input
+    Gr2 = [Gr; c2d(feedback(C, G), Ts)]
+    Gu2 = [Gu; c2d(feedback(C*G), Ts)]
+    plot(lsim([Gr2 Gu2], [r; sol2.A[end]]))
     
     @test all(diff(norm.(sol1.E)) .< 0)
     @test all(diff(norm.(sol2.E)) .< 0)
 
     @test norm(sol2.E[end]) ≈ 4.4544077312015835 atol = 1e-1
+
+
+@testset "multivariate" begin
+    @info "Testing multivariate"
+    # Gr2 = append(Gr, c2d(feedback(C, G), Ts))
+    Gr_constraints = [Gr; c2d(feedback(C, G), Ts)]
+    Gu_constraints = [Gu; c2d(feedback(C*G), Ts)]
+
+    Q = 1000I(Gr.ny)
+    R = 0.001I(Gu.nu)
+    
+    U = function (model, v)
+        l,u = (-25ones(Gu_constraints.nu), 25ones(Gu_constraints.nu))
+        JuMP.@constraint(model, [i=1:size(v, 2)], l .<= v[:, i] .<= u)
+    end
+    
+    Y = function (model, yh)
+        u = [1.1, 1000]
+        l = -u
+        JuMP.@constraint(model, [i=1:size(yh, 2)], l .<= yh[:, i] .<= u)
+    end
+    
+    # r2 = [r; zero(r)]
+    # prob = ILCProblem(; r=r2, Gr=Gr2, Gu=Gu2)
+    prob = ILCProblem(; r, Gr, Gu)
+    alg = ConstrainedILC(; Gr_constraints, Gu_constraints, Q, R, U, Y, opt=OSQP.Optimizer, verbose=false, α=1)
+    workspace = init(prob, alg);
+    sol = ilc(prob, alg; iters=5)
+    plot(sol)
+
+
+    constrained_res = lsim([Gr_constraints Gu_constraints], [r; sol.A[end]])
+    plot(constrained_res)
+    @test all(-1000.01 .<= constrained_res.y[2,:] .<= 1000.01)
+    ##
+    
+    @test all(diff(norm.(sol.E)) .< 0)
+
+    @test norm(sol.E[end]) ≈ 4.940690279813115 atol = 1e-1
+
+
 end
 
 
+
+
+
+end
 
