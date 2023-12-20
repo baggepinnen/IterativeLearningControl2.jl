@@ -4,6 +4,7 @@ using ControlSystemsBase, RecipesBase, LinearAlgebra
 export ilc,
     OptimizationILC, HeuristicILC,
     ILCProblem,
+    compute_input,
     ilc_theorem
 
 
@@ -25,7 +26,7 @@ function lsim_noncausal(L::LTISystem{<:Discrete}, u, args...; kwargs...)
     res.y
 end
 
-function hankel(x,L::Int)
+function hankel_operator(x,L::Int)
     H = zeros(L, L)
     for i = 1:L
         H[i:end, i] = x[1:end-i]
@@ -33,13 +34,30 @@ function hankel(x,L::Int)
     H
 end
 
-function hankel(sys::LTISystem{<:Discrete}, N::Int)
+"""
+    hankel(sys::LTISystem{<:Discrete}, N::Int)
+
+Return a matrix operator ``H`` such that ``Hu^T = y^T`` where `y = lsim(H, u)`. `H` is a Hankel matrix containing the Markov parameters of the system (scaled impulse response).
+"""
+function hankel_operator(sys::LTISystem{<:Discrete}, N::Int)
     ControlSystemsBase.issiso(sys) || error("System must be SISO")
     Tf = N*sys.Ts
-    imp = impulse(sys, Tf).y[:] .* sys.Ts # TODO: test with non-unit Ts
-    hankel(imp, N)
+    imp = impulse(sys, Tf).y[:] .* sys.Ts
+    hankel_operator(imp, N)
 end
 
+"""
+    ILCSolution
+
+A structure representing the solution to an ILC problem. 
+
+# Fields:
+- `Y`: Plant responses. `Y[i]` is the response during the `i`th iteration
+- `E`: Errors. `E[i]` is the error during the `i`th iteration
+- `A`: ILC inputs. `A[i]` is the ILC input during the `i`th iteration.
+- `prob`: The `ILCProblem` that was solved
+- `alg`: The `ILCAlgorithm` that was used
+"""
 struct ILCSolution
     Y
     E
@@ -47,6 +65,14 @@ struct ILCSolution
     prob
     alg
 end
+
+"""
+    ILCProblem
+
+# Fields:
+- `r`: Reference signal
+- `sim`: A function that takes `(r, a)` and returns a `SimResult` from `lsim`.
+"""
 struct ILCProblem
     r
     sim
@@ -81,14 +107,13 @@ bodeplot!((1 - L*Gcact), plotphase=false, lab="\$1 - LG\$ actual")
 This plot can be constructed using the [`ilc_theorem`](@ref) function.
 
 # Fields:
-- `Q`: Robustness filter
-- `L`: Learning filter
-- `t`: Time vector
+- `Q`: Robustness filter. The filter will be applied both forwards and backwards in time, and the effective filter transfer funciton is thus ``Q(z)Q(z̄)``.
+- `L`: Learning filter. This filter may be non-causal.
+- `location`: Either `:ref` or `:input`. If `:ref`, the ILC input is added to the reference signal, otherwise it is added to the input signal directly.
 """
 @kwdef struct HeuristicILC <: ILCAlgorithm
     Q
     L
-    t
     location::Symbol = :ref
 end
 
@@ -102,8 +127,18 @@ function simulate(prob, alg::HeuristicILC, a)
     end
 end
 
+"""
+    compute_input(alg::ILCAlgorithm, a, e)
+
+Compute the next ILC input using the learning rule
+
+# Arguments:
+- `a`: Previous ILC input
+- `e`: Error `r - y`
+"""
 function compute_input(alg::HeuristicILC, a, e)
-    (; Q, L, t) = alg
+    (; Q, L) = alg
+    t = range(0, step=Q.Ts, length=size(a, 2))
     Le = lsim_noncausal(L, e, t)
     lsim_zerophase(Q, a + Le, t) # Update ILC adjustment
 end
@@ -118,7 +153,7 @@ end
 """
     OptimizationILC(Gu::LTISystem; N::Int, ρ = 1e-3, λ = 1e-3)
 
-Optimization-based linear ILC algorithm from Norrlöf's thesis.
+Optimization-based linear ILC algorithm from Norrlöf's thesis. This algorithm applies the ILC feedforward signal directly to the plant input.
 
 # Arguments:
 - `Gu`: System model from ILC feedforward input to output
@@ -127,7 +162,7 @@ Optimization-based linear ILC algorithm from Norrlöf's thesis.
 - `λ`: Step size penalty
 """
 function OptimizationILC(Gu::LTISystem; N::Int, ρ=1e-3, λ=1e-3)
-    Tu = hankel(Gu, N)
+    Tu = hankel_operator(Gu, N)
     OptimizationILC(Tu, ρ, λ)
 end
 
@@ -136,9 +171,14 @@ function compute_input(alg::OptimizationILC, a, e)
     TTT = Tu'*Tu
     Q = ((ρ+λ)*I + TTT)\(λ*I + TTT)
     L = (λ*I + TTT)\Tu'
-    a = (Q*(a' + L*e'))'
+    (Q*(a' + L*e'))'
 end
 
+"""
+    ilc(prob, alg; iters = 5)
+
+Run the ILC algorithm for `iters` iterations. Returns a [`ILCSolution`](@ref) structure.
+"""
 function ilc(prob, alg; iters = 5)
     r = prob.r
     a = zero(r) # ILC adjustment signal starts at 0
@@ -158,17 +198,15 @@ function ilc(prob, alg; iters = 5)
 end
 
 @recipe function plot(sol::ILCSolution)
-
     layout := @layout([[a;b;c] d{0.3w}])
+    rmses = sqrt.(sum.(abs2, sol.E) ./ length.(sol.E))
+
     @series begin
         title --> ["Output \$y(t)\$" "Feedforward \$a\$"]
         label --> permutedims(["Iter $iter" for iter in 1:length(sol.Y)])
         sp --> 1
         reduce(vcat, sol.Y)'
     end
-
-    rmses = sqrt.(sum.(abs2, sol.E) ./ length.(sol.E))
-
 
     @series begin
         title --> "Tracking error \$e(t)\$"
@@ -191,7 +229,6 @@ end
         framestyle --> :zerolines
         rmses
     end
-
 end
 
 """
