@@ -70,7 +70,9 @@ a_k(t) &= Q(q) \\big( a_{k-1}(t) + L(q) e_{k-1}(t) \\big)
 ```
 
 A theorem due to Norrlöf says that for this ILC iterations to converge, one needs to satisfy
-$$| 1 - LG | < |Q^{-1}|$$
+```math
+| 1 - LG | < |Q^{-1}|
+```
 which we can verify by looking at the Bode curves of the two sides of the inequality
 ```@example ilc
 bodeplot([inv(Q), (1 - L*Gc)], plotphase=false, lab=["Stability boundary \$Q^{-1}\$" "\$1 - LG\$"])
