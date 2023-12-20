@@ -148,7 +148,7 @@ which we can verify by looking at the plot produced by the [`ilc_theorem`](@ref)
 
 # Fields:
 - `Q(z)`: Robustness filter (discrete time). The filter will be applied both forwards and backwards in time (like `filtfilt`), and the effective filter transfer funciton is thus ``Q(z)Q(z̄)``.
-- `L(z)`: Learning filter (discrete time). This filter may be non-causal, for example `L = G^{-1}` where ``G`` is the closed-loop transfer function.
+- `L(z)`: Learning filter (discrete time). This filter may be non-causal, for example ``L = G^{-1}`` where ``G`` is the closed-loop transfer function.
 - `location`: Either `:ref` or `:input`. If `:ref`, the ILC input is added to the reference signal, otherwise it is added to the input signal directly.
 """
 @kwdef struct HeuristicILC{QT<:LTISystem{<:Discrete}, LT<:LTISystem{<:Discrete}} <: ILCAlgorithm
@@ -222,7 +222,7 @@ end
 
 Run the ILC algorithm for `iters` iterations. Returns a [`ILCSolution`](@ref) structure.
 
-To simulate the effect of plat-model mismatch, one may provide a different instance of the ILCProblem using the `actual` keyword argument which is used to simulate the plant response. The ILC update will be performed using the plant model from `prob`, while simulated data will be aquired from `actual`.
+To simulate the effect of plant-model mismatch, one may provide a different instance of the ILCProblem using the `actual` keyword argument which is used to simulate the plant response. The ILC update will be performed using the plant model from `prob`, while simulated data will be acquired from `actual`.
 """
 function ilc(prob, alg; iters = 5, actual = prob)
     workspace = init(prob, alg)
@@ -295,13 +295,13 @@ Plot the stability boundary for the ILC algorithm.
 - `Gc`: The closed-loop system from ILC signal to output. If `alg.location = :ref`, this is typically given by `feedback(P*C)` while if `alg.location = :input`, this is typically given by `feedback(P, C)`.
 - `Gcact`: If provided, this is the "actual" closed-loop system which may be constructed using a different plant model than `Gc`. This is useful when trying to determine if the filter choises will lead to a robust ILC algorithm. `Gc` may be constructed using, e.g., uncertain parameters, see https://juliacontrol.github.io/RobustAndOptimalControl.jl/dev/uncertainty/ for more details.
 """
-function ilc_theorem(alg::HeuristicILC, Gc, Gcact=nothing)
+function ilc_theorem(alg::HeuristicILC, Gc, Gcact=nothing; w=ControlSystemsBase._default_freq_vector(LTISystem[Gc, alg.L, alg.Q], Val(:bode)))
     (; L, Q) = alg
-    fig = bodeplot([inv(Q), (1 - L*Gc)], plotphase=false, lab=["Stability boundary \$Q^{-1}\$" "\$1 - LG\$"], c=[:black 1], linestyle=[:dash :solid])
-    fig2 = nyquistplot(Q*(1 - L*Gc), unit_circle=true, lab="\$Q(1 - LG)\$")
+    fig = bodeplot(LTISystem[inv(Q), (1 - L*Gc)], w, plotphase=false, lab=["Stability boundary \$Q^{-1}\$" "\$1 - LG\$"], c=[:black 1], linestyle=[:dash :solid])
+    fig2 = nyquistplot(Q*(1 - L*Gc), w, unit_circle=true, lab="\$Q(1 - LG)\$", ylims=(-2, 2), xlims=(-2, 2))
     if Gcact !== nothing
-        bodeplot!(fig, (1 - L*Gcact), plotphase=false, lab="\$1 - LG\$ actual", c=2)
-        nyquistplot!(fig2, Q*(1 - L*Gcact), lab="\$Q(1 - LG)\$ actual")
+        bodeplot!(fig, (1 - L*Gcact), w, plotphase=false, lab="\$1 - LG\$ actual", c=2, q=1)
+        nyquistplot!(fig2, Q*(1 - L*Gcact), w, lab="\$Q(1 - LG)\$ actual", ylims=(-1.5, 1.5), xlims=(-1.5, 1.5), q=1)
     end    
     RecipesBase.plot(fig, fig2)
 end
