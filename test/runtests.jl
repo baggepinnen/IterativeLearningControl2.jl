@@ -32,6 +32,18 @@ end
 
 @testset "IterativeLearningControl.jl" begin
 
+
+    @testset "hankel operator" begin
+        @info "Testing hankel operator"
+        G = ssrand(1,1,5,Ts=1)
+        N = 30
+        u = randn(1, N)
+        OP = IterativeLearningControl.hankel_operator(G, N)
+        y = lsim(G, u).y
+        y2 = (OP*u')'
+        @test y ≈ y2
+    end
+
     # Continuous
     G    = double_mass_model(Jl = 1)
     Gact = double_mass_model(Jl = 1.5) # 50% more load than modeled
@@ -62,9 +74,9 @@ end
     L3 = 0.5inv(tf(Gu))
 
     prob = ILCProblem(r, simact)
-    alg1 = HeuristicILC(Q1, L1, t, :ref)
+    alg1 = HeuristicILC(Q1, L1, :ref)
     alg2 = OptimizationILC(Gu; N, ρ=0.00001, λ=0.0001)
-    alg3 = HeuristicILC(Q3, L3, t, :input)
+    alg3 = HeuristicILC(Q3, L3, :input)
     sol1 = ilc(prob, alg1)
     sol2 = ilc(prob, alg2)
     sol3 = ilc(prob, alg3)
@@ -73,6 +85,10 @@ end
     @test all(diff(norm.(sol2.E)) .< 0)
     @test all(diff(norm.(sol3.E)) .< 0)
     @test all(norm.(sol2.E) .<= norm.(sol2.E))
+
+    @test norm(sol1.E[end]) <= 1.0001*0.6358364794186305
+    @test norm(sol2.E[end]) <= 1.0001*0.5615131021547797
+    @test norm(sol3.E[end]) <= 1.0001*1.416392979780404
 
     plot(sol1)
 
