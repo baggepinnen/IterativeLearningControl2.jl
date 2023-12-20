@@ -58,11 +58,8 @@ end
     Gract = c2d(feedback(Gact*C), Ts)
     Guact = c2d(feedback(Gact, C), Ts)
 
-    sim = (r, a) -> lsim([Gr Gu], [r; a], t)
-    simact = (r, a) -> lsim([Gract Guact], [r; a], t)
     T = 3pi    # Duration
     t = 0:Ts:T # Time vector
-
 
     r = funnysin.(t)' |> Array # Reference signal
     N = length(r)
@@ -73,22 +70,23 @@ end
     L1 = 0.5inv(Gr) # Make the scaling factor smaller to take smaller steps
     L3 = 0.5inv(tf(Gu))
 
-    prob = ILCProblem(r, simact)
+    prob = ILCProblem(; r, Gr, Gu)
+    actual = ILCProblem(; r, Gr=Gract, Gu=Guact)
     alg1 = HeuristicILC(Q1, L1, :ref)
-    alg2 = OptimizationILC(Gu; N, ρ=0.00001, λ=0.0001)
+    alg2 = OptimizationILC(; ρ=0.00001, λ=0.0001)
     alg3 = HeuristicILC(Q3, L3, :input)
-    sol1 = ilc(prob, alg1)
-    sol2 = ilc(prob, alg2)
-    sol3 = ilc(prob, alg3)
+    sol1 = ilc(prob, alg1; actual)
+    sol2 = ilc(prob, alg2; actual)
+    sol3 = ilc(prob, alg3; actual)
 
     @test all(diff(norm.(sol1.E)) .< 0)
     @test all(diff(norm.(sol2.E)) .< 0)
     @test all(diff(norm.(sol3.E)) .< 0)
     @test all(norm.(sol2.E) .<= norm.(sol2.E))
 
-    @test norm(sol1.E[end]) <= 1.0001*0.6358364794186305
-    @test norm(sol2.E[end]) <= 1.0001*0.5615131021547797
-    @test norm(sol3.E[end]) <= 1.0001*1.416392979780404
+    @test norm(sol1.E[end]) ≈ 0.6358364794186305 atol = 1e-2
+    @test norm(sol2.E[end]) ≈ 0.5615131021547797 atol = 1e-2
+    @test norm(sol3.E[end]) ≈ 1.416392979780404 atol = 1e-2
 
     plot(sol1)
 

@@ -4,7 +4,7 @@ using ControlSystemsBase, RecipesBase, LinearAlgebra
 export ilc,
     OptimizationILC, HeuristicILC,
     ILCProblem,
-    compute_input,
+    init, compute_input,
     ilc_theorem
 
 
@@ -71,16 +71,55 @@ end
 
 # Fields:
 - `r`: Reference signal
-- `sim`: A function that takes `(r, a)` and returns a `SimResult` from `lsim`.
+- `Gr`: Closed-loop transfer function from reference to output
+- `Gu`: Closed-loop transfer function from plant input to output
 """
 struct ILCProblem
     r
-    sim
+    Gr
+    Gu
 end
 
-simulate(prob, alg, a) = prob.sim(prob.r, a)
+
+"""
+    ILCProblem(; r, Gr, Gu)
+    ILCProblem(; r, P, C)
+
+Construct an ILCProblem given either
+- The closed-loop transfer functions from reference to output and from plant input to output, or
+- The plant and controller transfer functions
+
+
+- `r`: Reference trajectory
+- `Gr`: Closed-loop transfer function from reference to output
+- `Gu`: Closed-loop transfer function from plant input to output
+- `P`: Plant model
+- `C`: Controller transfer function
+"""
+function ILCProblem(; r, Gr=nothing, Gu=nothing, P=nothing, C=nothing)
+    if Gr !== nothing && Gu !== nothing
+
+    elseif P !== nothing && C !== nothing
+        Gr = feedback(P*C)
+        Gu = feedback(P, C)
+    else
+        error("Either (Gr, Gu) or (P, C) must be provided")
+    end
+    N = size(r, 2)
+    t = range(0, step=Gr.Ts, length=N)
+    ILCProblem(r, Gr, Gu)
+end
+
+simulate(prob, alg, a) = lsim([prob.Gr prob.Gu], [prob.r; a])
 
 abstract type ILCAlgorithm end
+
+"""
+    init(prob, alg)
+
+Initialize the ILC algorithm. This function is called internally by the funciton [`ilc`](@ref) but manual iterations require the user to initialize the workspace explicitly.
+"""
+init(prob, alg) = nothing
 
 """
     HeuristicILC
@@ -107,8 +146,8 @@ bodeplot!((1 - L*Gcact), plotphase=false, lab="\$1 - LG\$ actual")
 This plot can be constructed using the [`ilc_theorem`](@ref) function.
 
 # Fields:
-- `Q`: Robustness filter. The filter will be applied both forwards and backwards in time, and the effective filter transfer funciton is thus ``Q(z)Q(z̄)``.
-- `L`: Learning filter. This filter may be non-causal.
+- `Q`: Robustness filter. The filter will be applied both forwards and backwards in time (like `filtfilt`), and the effective filter transfer funciton is thus ``Q(z)Q(z̄)``.
+- `L`: Learning filter. This filter may be non-causal, for example `L = G^{-1}` where ``G`` is the closed-loop transfer function.
 - `location`: Either `:ref` or `:input`. If `:ref`, the ILC input is added to the reference signal, otherwise it is added to the input signal directly.
 """
 @kwdef struct HeuristicILC <: ILCAlgorithm
@@ -119,24 +158,26 @@ end
 
 function simulate(prob, alg::HeuristicILC, a)
     if alg.location === :ref
-        prob.sim(prob.r+a, zero(a))
+        lsim([prob.Gr prob.Gu], [prob.r+a; zero(a)])
     elseif alg.location === :input
-        prob.sim(prob.r, a)
+        lsim([prob.Gr prob.Gu], [prob.r; a])
     else
         error("Unknown location: $(alg.location)")
     end
 end
 
 """
-    compute_input(alg::ILCAlgorithm, a, e)
+    compute_input(alg::ILCAlgorithm, workspace, a, e)
 
 Compute the next ILC input using the learning rule
 
 # Arguments:
+- `alg`: The ILC algorithm
+- `workspace`: A workspace created by calling [`init`](@ref) on the algorithm: `workspace = init(prob, alg)`.
 - `a`: Previous ILC input
 - `e`: Error `r - y`
 """
-function compute_input(alg::HeuristicILC, a, e)
+function compute_input(alg::HeuristicILC, _, a, e)
     (; Q, L) = alg
     t = range(0, step=Q.Ts, length=size(a, 2))
     Le = lsim_noncausal(L, e, t)
@@ -144,30 +185,32 @@ function compute_input(alg::HeuristicILC, a, e)
 end
 
 
-struct OptimizationILC{T} <: ILCAlgorithm
-    Tu::T
+struct OptimizationILC <: ILCAlgorithm
     ρ::Float64
     λ::Float64
 end
 
 """
-    OptimizationILC(Gu::LTISystem; N::Int, ρ = 1e-3, λ = 1e-3)
+    OptimizationILC(Gu::LTISystem; ρ = 1e-3, λ = 1e-3)
 
 Optimization-based linear ILC algorithm from Norrlöf's thesis. This algorithm applies the ILC feedforward signal directly to the plant input.
 
 # Arguments:
-- `Gu`: System model from ILC feedforward input to output
-- `N`: Trajectory length
 - `ρ`: Penalty on feedforward control action
 - `λ`: Step size penalty
+- `Gu`: System model from ILC feedforward input to output
 """
-function OptimizationILC(Gu::LTISystem; N::Int, ρ=1e-3, λ=1e-3)
-    Tu = hankel_operator(Gu, N)
-    OptimizationILC(Tu, ρ, λ)
+function OptimizationILC(; ρ=1e-3, λ=1e-3)
+    OptimizationILC(ρ, λ)
 end
 
-function compute_input(alg::OptimizationILC, a, e)
-    (; Tu, ρ, λ) = alg
+function init(prob, alg::OptimizationILC)
+    (; Tu = hankel_operator(prob.Gu, size(prob.r, 2)))
+end
+
+function compute_input(alg::OptimizationILC, workspace, a, e)
+    (; ρ, λ) = alg
+    Tu = workspace.Tu
     TTT = Tu'*Tu
     Q = ((ρ+λ)*I + TTT)\(λ*I + TTT)
     L = (λ*I + TTT)\Tu'
@@ -175,21 +218,24 @@ function compute_input(alg::OptimizationILC, a, e)
 end
 
 """
-    ilc(prob, alg; iters = 5)
+    ilc(prob, alg; iters = 5, actual=prob)
 
 Run the ILC algorithm for `iters` iterations. Returns a [`ILCSolution`](@ref) structure.
+
+To simulate the effect of plat-model mismatch, one may provide a different instance of the ILCProblem using the `actual` keyword argument which is used to simulate the plant response. The ILC update will be performed using the plant model from `prob`, while simulated data will be aquired from `actual`.
 """
-function ilc(prob, alg; iters = 5)
+function ilc(prob, alg; iters = 5, actual = prob)
+    workspace = init(prob, alg)
     r = prob.r
     a = zero(r) # ILC adjustment signal starts at 0
     Y = typeof(r)[]
     E = typeof(r)[]
     A = typeof(r)[]
     for iter = 1:iters
-        res = simulate(prob, alg, a)
+        res = simulate(actual, alg, a)
         y = res.y
         e = r .- y
-        a = compute_input(alg, a, e)
+        a = compute_input(alg, workspace, a, e)
         push!(Y, y)
         push!(E, e)
         push!(A, a)
