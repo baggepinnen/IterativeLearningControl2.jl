@@ -14,6 +14,7 @@ function lsim_zerophase(G, u, args...; kwargs...)
 end
 
 function lsim_noncausal(L::LTISystem{<:Discrete}, u, args...; kwargs...)
+    L isa AbstractStateSpace && (return lsim(L, u, args...; kwargs...))
     np = length(denpoly(L)[])
     nz = length(numpoly(L)[])
     zeroexcess = nz-np
@@ -37,7 +38,7 @@ end
 """
     hankel(sys::LTISystem{<:Discrete}, N::Int)
 
-Return a matrix operator ``H`` such that ``Hu^T = y^T`` where `y = lsim(H, u)`. `H` is a Hankel matrix containing the Markov parameters of the system (scaled impulse response).
+Return a matrix operator ``H`` such that ``Hu^T = y^T`` where `y = lsim(H, u)`. ``H`` is a Hankel matrix containing the Markov parameters of the system (scaled impulse response).
 """
 function hankel_operator(sys::LTISystem{<:Discrete}, N::Int)
     ControlSystemsBase.issiso(sys) || error("System must be SISO")
@@ -106,7 +107,7 @@ function ILCProblem(; r, Gr=nothing, Gu=nothing, P=nothing, C=nothing)
         error("Either (Gr, Gu) or (P, C) must be provided")
     end
     N = size(r, 2)
-    t = range(0, step=Gr.Ts, length=N)
+    # t = range(0, step=Gr.Ts, length=N)
     ILCProblem(r, Gr, Gu)
 end
 
@@ -128,22 +129,22 @@ Apply the learning rule
 
 ```math
 \\begin{aligned}
-y_k(t) &= G(q) \\big(r(t) + a_k(t) \\big) \\\\
+y_k(t) &= G_r(q) \\big(r(t) + a_k(t) \\big) \\\\
 e_k(t) &= r(t) - y_k(t) \\\\
 a_k(t) &= Q(q) \\big( a_{k-1}(t) + L(q) e_{k-1}(t) \\big)
 \\end{aligned}
+```
+
+If `location = :input`, the first equation above is replaced by
+```math
+y_k(t) = G_r(q) r(t) + G_u(q) a_k(t)
 ```
 
 A theorem due to Norrlöf says that for this ILC iterations to converge, one needs to satisfy
 ```math
 | 1 - LG | < |Q^{-1}|
 ```
-which we can verify by looking at the Bode curves of the two sides of the inequality
-```@example ilc
-bodeplot([inv(Q), (1 - L*Gc)], plotphase=false, lab=["Stability boundary \$Q^{-1}\$" "\$1 - LG\$"])
-bodeplot!((1 - L*Gcact), plotphase=false, lab="\$1 - LG\$ actual")
-```
-This plot can be constructed using the [`ilc_theorem`](@ref) function.
+which we can verify by looking at the plot produced by the [`ilc_theorem`](@ref) function.
 
 # Fields:
 - `Q`: Robustness filter. The filter will be applied both forwards and backwards in time (like `filtfilt`), and the effective filter transfer funciton is thus ``Q(z)Q(z̄)``.
