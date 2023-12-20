@@ -86,10 +86,11 @@ end
     ILCProblem(; r, Gr, Gu)
     ILCProblem(; r, P, C)
 
-Construct an ILCProblem given either
+Construct an ILCProblem given discrete-time transfer function models of either
 - The closed-loop transfer functions from reference to output and from plant input to output, or
 - The plant and controller transfer functions
 
+Continuous-time transfer functions can be discretized using the function `ControlSystemsBase.c2d`.
 
 - `r`: Reference trajectory
 - `Gr`: Closed-loop transfer function from reference to output
@@ -108,6 +109,7 @@ function ILCProblem(; r, Gr=nothing, Gu=nothing, P=nothing, C=nothing)
     end
     N = size(r, 2)
     # t = range(0, step=Gr.Ts, length=N)
+    isdiscrete(Gr) && isdiscrete(Gu) || error("Gr and Gu must be discrete-time transfer functions. Continuous-time transfer function can be discretized using the function c2d.")
     ILCProblem(r, Gr, Gu)
 end
 
@@ -147,13 +149,13 @@ A theorem due to Norrlöf says that for this ILC iterations to converge, one nee
 which we can verify by looking at the plot produced by the [`ilc_theorem`](@ref) function.
 
 # Fields:
-- `Q`: Robustness filter. The filter will be applied both forwards and backwards in time (like `filtfilt`), and the effective filter transfer funciton is thus ``Q(z)Q(z̄)``.
-- `L`: Learning filter. This filter may be non-causal, for example `L = G^{-1}` where ``G`` is the closed-loop transfer function.
+- `Q(z)`: Robustness filter (discrete time). The filter will be applied both forwards and backwards in time (like `filtfilt`), and the effective filter transfer funciton is thus ``Q(z)Q(z̄)``.
+- `L(z)`: Learning filter (discrete time). This filter may be non-causal, for example `L = G^{-1}` where ``G`` is the closed-loop transfer function.
 - `location`: Either `:ref` or `:input`. If `:ref`, the ILC input is added to the reference signal, otherwise it is added to the input signal directly.
 """
-@kwdef struct HeuristicILC <: ILCAlgorithm
-    Q
-    L
+@kwdef struct HeuristicILC{QT<:LTISystem{<:Discrete}, LT<:LTISystem{<:Discrete}} <: ILCAlgorithm
+    Q::QT
+    L::LT
     location::Symbol = :ref
 end
 
@@ -192,14 +194,13 @@ struct OptimizationILC <: ILCAlgorithm
 end
 
 """
-    OptimizationILC(Gu::LTISystem; ρ = 1e-3, λ = 1e-3)
+    OptimizationILC(; ρ = 1e-3, λ = 1e-3)
 
 Optimization-based linear ILC algorithm from Norrlöf's thesis. This algorithm applies the ILC feedforward signal directly to the plant input.
 
 # Arguments:
 - `ρ`: Penalty on feedforward control action
 - `λ`: Step size penalty
-- `Gu`: System model from ILC feedforward input to output
 """
 function OptimizationILC(; ρ=1e-3, λ=1e-3)
     OptimizationILC(ρ, λ)
@@ -249,10 +250,18 @@ end
     rmses = sqrt.(sum.(abs2, sol.E) ./ length.(sol.E))
 
     @series begin
-        title --> ["Output \$y(t)\$" "Feedforward \$a\$"]
         label --> permutedims(["Iter $iter" for iter in 1:length(sol.Y)])
         sp --> 1
         reduce(vcat, sol.Y)'
+    end
+    
+    @series begin
+        sp --> 1
+        title --> "Output \$y(t)\$"
+        label --> "Reference \$r(t)\$"
+        color --> :black
+        linestyle --> :dash
+        sol.prob.r'
     end
 
     @series begin
@@ -263,7 +272,7 @@ end
     end
 
     @series begin
-        title --> "Feedforward\$"
+        title --> "Feedforward \$a(t)\$"
         sp --> 3
         legend --> false
         reduce(vcat, sol.A)'
