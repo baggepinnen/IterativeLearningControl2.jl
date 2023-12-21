@@ -4,7 +4,7 @@
 
 ## What is ILC?
 
-ILC can be thought of as a simple reinforcement-learning strategy that is suitable in situations where a *repetitive task* is to be performed multiple times, and disturbances acting on the system are also repetitive and predictable but unknown. Multiple versions of ILC exists, of which we support a few that are listed below.
+[ILC](https://en.wikipedia.org/wiki/Iterative_learning_control) can be thought of as a simple reinforcement-learning strategy that is suitable in situations where a *repetitive task* is to be performed multiple times, and disturbances acting on the system are also repetitive and predictable but unknown. Multiple versions of ILC exists, of which we support a few that are listed below.
 
 
 ## Algorithms
@@ -30,6 +30,7 @@ tab_algs = String(take!(io)) |> HTML
 tab_algs # hide
 ```
 
+Each algorithm has an associated documentation page available from the menu on the left. The 🔶 used for [`HeuristicILC`](@ref) indicates that the learning filters may be optionally chosen in a model-based way, but heuristic choices are also possible.
 
 ## Terminology
 In this documentation, we will refer to the following signals and (discrete-time) transfer functions

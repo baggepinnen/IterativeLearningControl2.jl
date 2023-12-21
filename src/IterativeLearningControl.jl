@@ -123,7 +123,8 @@ Initialize the ILC algorithm. This function is called internally by the funciton
 init(prob, alg) = nothing
 
 """
-    HeuristicILC
+    HeuristicILC(  Q, L, location)        # Positional arguments
+    HeuristicILC(; Q, L, location = :ref) # Keyword arguments
 
 Apply the learning rule
 
@@ -208,6 +209,7 @@ function init(prob, alg::OptimizationILC)
     (; Tu = hankel_operator(prob.Gu, size(prob.r, 2)))
 end
 
+# TODO: adjust this algorithm to work with MIMO systems
 function compute_input(alg::OptimizationILC, workspace, a, e)
     (; ρ, λ) = alg
     Tu = workspace.Tu
@@ -221,8 +223,12 @@ end
     ilc(prob, alg; iters = 5, actual=prob)
 
 Run the ILC algorithm for `iters` iterations. Returns a [`ILCSolution`](@ref) structure.
+    
+To manually perform ILC iterations, see the functions
+- [`init`](@ref)
+- [`compute_input`](@ref)
 
-To simulate the effect of plant-model mismatch, one may provide a different instance of the ILCProblem using the `actual` keyword argument which is used to simulate the plant response. The ILC update will be performed using the plant model from `prob`, while simulated data will be acquired from `actual`.
+To simulate the effect of plant-model mismatch, one may provide a different instance of the ILCProblem using the `actual` keyword argument which is used to simulate the plant response. The ILC update will be performed using the plant model from `prob`, while simulated data will be acquired from the plant models in the `actual` problem.
 """
 function ilc(prob, alg; iters = 5, actual = prob)
     workspace = init(prob, alg)
@@ -309,15 +315,12 @@ end
 
 
 
-## Mv stuff
-
-
-
-
 """
-    ConstrainedILC
+    ConstrainedILC(; Q, R, U, Y, Gr_constraints, Gu_constraints, opt, verbose=false, α)
 
 Constrained ILC algorithm from the paper "On Robustness in Optimization-Based Constrained Iterative Learning Control", Liao-McPherson and friends.
+
+The use of this ILC algorithms requires the user to manually install and load the packages `using JuMP, BlockArrays` as well as a compatible solver (such as `OSQP`).
 
 Supports MIMO systems.
 
@@ -327,14 +330,14 @@ Supports MIMO systems.
 - `U`: A function of `(model, a)` that adds constraints to the optimization problem. `a` is a size `(nu, N)` matrix of optimization variables that determines the optimized ILC input. See example below. 
 - `Y`: A function of `(model, yh)` that adds constraints to the optimization problem. `yh` is a size `(ny, N)` matrix of predicted plant outputs. See example below
 - `opt`: A JuMP-compatible optimizer, e.g., `OSQP.Optimizer`
-- `α`: Step size, should be smaller than 2. Smaller step sizes lead to more robust progress but slower convergence. Use a small stp size if the model is highly uncertain.
+- `α`: Step size, should be smaller than 2. Smaller step sizes lead to more robust progress but slower convergence. Use a small step size if the model is highly uncertain.
 - `verbose`: If `true`, print solver output
 - `Gr_constraints`: If provided, this is the closed-loop transfer function from reference to constrained outputs. If not provided, the constrained outputs are assumed to be equal to the plant outputs.
 - `Gu_constraints`: If provided, this is the closed-loop transfer function from plant input to constrained outputs. If not provided, the constrained outputs are assumed to be equal to the plant outputs.
 
 # Example
 ```
-using IterativeLearningControl, OSQP, JuMP, ControlSystemsBase
+using IterativeLearningControl, OSQP, JuMP, BlockArrays, ControlSystemsBase
 
 # Define Gr and Gu
 
@@ -386,12 +389,17 @@ end
 #     JuMP.value.(v)
 # end
 
+"""
+A little helper function that takes a matrix with dimensions `(nsignals, n_timepoints)` and returns a reshaped vector version that is suitable for multiplying the Hankel operator obtained by calling [`hankel_operator`](@ref) or [`mv_hankel_operator`](@ref).
+"""
 hv(x) = vec(x')
 
 """
     mv_hankel_operator(sys::LTISystem{<:Discrete}, N::Int)
 
 Return a matrix operator ``H`` such that `y == reshape(H*vec(u'), :, sys.ny)'` where `y = lsim(sys, u)`. ``H`` is a block Hankel matrix containing the Markov parameters of the system (scaled impulse response).
+
+Use of this function requires the user to manually install and load the packages `using JuMP, BlockArrays`.
 """
 function mv_hankel_operator end
 

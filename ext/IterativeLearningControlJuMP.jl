@@ -1,7 +1,7 @@
 module IterativeLearningControlJuMP
 using IterativeLearningControl, ControlSystemsBase, JuMP, LinearAlgebra, BlockArrays
 
-import IterativeLearningControl: mv_hankel_operator, hankel_operator, hv, compute_input, init
+import IterativeLearningControl: mv_hankel_operator, hankel_operator, compute_input, init
 
 
 
