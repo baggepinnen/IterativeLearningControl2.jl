@@ -116,7 +116,7 @@ simulate(prob, alg, a) = lsim([prob.Gr prob.Gu], [prob.r; a])
 abstract type ILCAlgorithm end
 
 """
-    init(prob, alg)
+    workspace = init(prob, alg)
 
 Initialize the ILC algorithm. This function is called internally by the funciton [`ilc`](@ref) but manual iterations require the user to initialize the workspace explicitly.
 """

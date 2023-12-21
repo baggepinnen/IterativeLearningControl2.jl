@@ -14,6 +14,7 @@ makedocs(
                   "OptimizationILC" => "OptimizationILC.md",
                   "ConstrainedILC" => "ConstrainedILC.md",
             ],
+            "Manual ILC iterations" => "manual.md",
             "API" => "api.md",
       ],
       format = Documenter.HTML(prettyurls = haskey(ENV, "CI")),

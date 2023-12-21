@@ -125,7 +125,7 @@ Above, we plotted this curve also for the actual dynamics. This is of course not
 
 ## ILC iteration
 
-The next step is to implement the ILC scheme and run it:
+The next step is to implement the ILC scheme and run it using the function [`ilc`](@ref):
     
 ```@example HEURISTIC_ILC
 prob = ILCProblem(; r, Gr, Gu)
