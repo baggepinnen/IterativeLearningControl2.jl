@@ -9,7 +9,7 @@ makedocs(
       warnonly = [:autodocs_block],
       pages = [
             "Home" => "index.md",
-            "Algoriths" => [
+            "Algorithms" => [
                   "HeuristicILC" => "HeuristicILC.md",
                   "OptimizationILC" => "OptimizationILC.md",
                   "ConstrainedILC" => "ConstrainedILC.md",

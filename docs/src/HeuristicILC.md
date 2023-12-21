@@ -18,7 +18,7 @@ where the transfer function $G_u(q)$ is the closed-loop transfer function from p
 
 In simulation (the rollout $y_k = G_r(q) (r + a_k)$ is simulated), this scheme is nothing other than an open-loop optimal-control strategy, while if $y_k = G_r(q) (r + a_k)$ amounts to performing an actual experiment on a process, ILC turns into episode-based reinforcement learning or adaptive control.
 
-The system to control in this example is a double-mass system with a spring and damper in between. This system is a common model of a servo system where one mass represents the motor and the other represents the load. The spring and damper represents a flexible transmission between them. We will create two instances of the system model. ``G`` represents the nominal model, whereas ``G_{act}`` represents the actual (unknown) dynamics. This simulates a model-based approach where there is a slight error in the model. The error will lie in the mass of the load, simulating, e.g., that the motor is driving a heavier load than specified. 
+The system to control in this example is a double-mass system with a spring and damper in between. This system is a common model of a servo system where one mass represents the motor and the other represents the load. The spring and damper represents a flexible transmission between them. We will create two instances of the system model. ``P`` represents the nominal model, whereas ``P_{act}`` represents the actual (unknown) dynamics. This simulates a model-based approach where there is a slight error in the model. The error will lie in the mass of the load, simulating, e.g., that the motor is driving a heavier load than specified. 
 
 # Example
 
@@ -53,18 +53,18 @@ function double_mass_model(;
 end
 
 # Continuous
-G    = double_mass_model(Jl = 1)
-Gact = double_mass_model(Jl = 1.5) # 50% more load than modeled
+P    = double_mass_model(Jl = 1)
+Pact = double_mass_model(Jl = 1.5) # 50% more load than modeled
 C  = pid(10, 1, 1, form = :series) * tf(1, [0.02, 1])
 Ts = 0.02 # Sample time
 z = tf("z", Ts)
 
 
 # Discrete
-Gr = c2d(feedback(G*C), Ts)       |> tf
-Gu = c2d(feedback(G, C), Ts)
-Gract = c2d(feedback(Gact*C), Ts)
-Guact = c2d(feedback(Gact, C), Ts)
+Gr = c2d(feedback(P*C), Ts)       |> tf
+Gu = c2d(feedback(P, C), Ts)
+Gract = c2d(feedback(Pact*C), Ts)
+Guact = c2d(feedback(Pact, C), Ts)
 
 bodeplot([Gr, Gract], lab=["G model" "G actual"], plotphase=false)
 ```

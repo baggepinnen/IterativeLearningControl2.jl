@@ -17,9 +17,9 @@ using PrettyTables, Markdown
 header = ["Algorithm", "Model based", "MIMO", "Cost function", "Constraints", "Computational complexity"]
 
 data = [
-    "HeuristicILC"        "🔶" "🟥" "🟥" "🟥" "Low (filtering)"
-    "OptimizationILC"     "🟢" "🟥" "🟢" "🟥" "Medium (matrix factorization)"
-    "ConstrainedILC"      "🟢" "🟢" "🟢" "🟢" "High (quadratic program)"
+    "HeuristicILC"        "🔶" "🟥" "🟥" "🟥" "Low 🚀 (filtering)"
+    "OptimizationILC"     "🟢" "🟥" "🟢" "🟥" "Medium 🤔 (matrix factorization)"
+    "ConstrainedILC"      "🟢" "🟢" "🟢" "🟢" "High 🏋️ (quadratic program)"
 ]
 
 io = IOBuffer()
