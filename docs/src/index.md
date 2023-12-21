@@ -4,7 +4,7 @@
 
 ## What is ILC?
 
-[ILC](https://en.wikipedia.org/wiki/Iterative_learning_control) can be thought of as a simple reinforcement-learning strategy that is suitable in situations where a *repetitive task* is to be performed multiple times, and disturbances acting on the system are also repetitive and predictable but unknown. Multiple versions of ILC exists, of which we support a few that are listed below.
+[ILC](https://slunik.slu.se/kursfiler/TE0010/10095.1213/REG2_ILCReview.pdf) can be thought of as a simple reinforcement-learning strategy that is suitable in situations where a *repetitive task* is to be performed multiple times, and disturbances acting on the system are also repetitive and predictable but unknown. Multiple versions of ILC exists, of which we support a few that are listed below.
 
 
 ## Algorithms

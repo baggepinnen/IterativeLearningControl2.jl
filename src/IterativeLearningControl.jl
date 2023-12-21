@@ -191,6 +191,7 @@ struct OptimizationILC <: ILCAlgorithm
     ρ::Float64
     λ::Float64
 end
+# NOTE: This algorithm can easily be extended to allow non-dentitity cost matrices, even to include frequency weighting in the cost.
 
 """
     OptimizationILC(; ρ = 1e-3, λ = 1e-3)
