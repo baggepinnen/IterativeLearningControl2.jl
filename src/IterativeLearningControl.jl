@@ -405,3 +405,11 @@ function mv_hankel_operator end
 
 
 end
+
+
+#=
+# TODO: NonlinearILC
+- Linearize the nonlinear model around the reference trajectory. In the presence of a feedback controller, the system shouldn't be too far away from the reference.
+- Implement LTV ILC. This can probably be done for all existing algorithms. Filtering is replaced by a time-varying filter. Hankel operators are replaced by LTV hankel operators (page 106 (11) https://slunik.slu.se/kursfiler/TE0010/10095.1213/REG2_ILCReview.pdf)
+- Introduce methods for `simulate`, `lsim_noncausal`, `hankel_operator` that works for LTV systems
+=#
