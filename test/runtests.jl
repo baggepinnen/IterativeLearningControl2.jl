@@ -121,7 +121,7 @@ end
     Q = 1000I(Gr.ny)
     R = 0.001I(Gu.nu)
     
-    U = function (model, v)
+    A = function (model, v)
         l,u = (-25ones(Gu.nu), 25ones(Gu.nu))
         JuMP.@constraint(model, [i=1:size(v, 2)], l .<= v[:, i] .<= u)
     end
@@ -131,7 +131,7 @@ end
         JuMP.@constraint(model, [i=1:size(yh, 2)], l .<= yh[:, i] .<= u)
     end
     
-    alg2 = ConstrainedILC(; Q, R, U, Y, opt=OSQP.Optimizer, verbose=true, α=1)
+    alg2 = ConstrainedILC(; Q, R, A, Y, opt=OSQP.Optimizer, verbose=true, α=1)
     sol2 = ilc(prob, alg2)
     plot(sol2)
     ## Look at the total plant input
@@ -154,7 +154,7 @@ end
     Q = 1000I(Gr.ny)
     R = 0.001I(Gu.nu)
     
-    U = function (model, v)
+    A = function (model, v)
         l,u = (-25ones(Gu_constraints.nu), 25ones(Gu_constraints.nu))
         JuMP.@constraint(model, [i=1:size(v, 2)], l .<= v[:, i] .<= u)
     end
@@ -168,7 +168,7 @@ end
     # r2 = [r; zero(r)]
     # prob = ILCProblem(; r=r2, Gr=Gr2, Gu=Gu2)
     prob = ILCProblem(; r, Gr, Gu)
-    alg = ConstrainedILC(; Gr_constraints, Gu_constraints, Q, R, U, Y, opt=OSQP.Optimizer, verbose=false, α=1)
+    alg = ConstrainedILC(; Gr_constraints, Gu_constraints, Q, R, A, Y, opt=OSQP.Optimizer, verbose=false, α=1)
     workspace = init(prob, alg);
     sol = ilc(prob, alg; iters=5)
     plot(sol)

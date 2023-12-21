@@ -1,4 +1,4 @@
-# Heuristic ILC
+# HeuristicILC
 
 A heuristic ILC scheme that operates by adjusting the reference signal ``r`` typically looks something like this, at ILC iteration $k$:
 ```math
@@ -18,9 +18,11 @@ where the transfer function $G_u(q)$ is the closed-loop transfer function from p
 
 In simulation (the rollout $y_k = G_r(q) (r + a_k)$ is simulated), this scheme is nothing other than an open-loop optimal-control strategy, while if $y_k = G_r(q) (r + a_k)$ amounts to performing an actual experiment on a process, ILC turns into episode-based reinforcement learning or adaptive control.
 
-The system to control in this example is a double-mass system with a spring and damper in between. This system is a common model of a servo system where one mass represents the motor and the other represents the load. The spring and damper represents a flexible transmission between them. We will create two instances of the system model. ``P`` represents the nominal model, whereas ``P_{act}`` represents the actual (unknown) dynamics. This simulates a model-based approach where there is a slight error in the model. The error will lie in the mass of the load, simulating, e.g., that the motor is driving a heavier load than specified. 
 
 # Example
+The system to control in this example is a double-mass system with a spring and damper in between. This system is a common model of a servo system where one mass represents the motor and the other represents the load. The spring and damper represents a flexible transmission between them. We will create two instances of the system model. ``P`` represents the nominal model, whereas ``P_{act}`` represents the actual (unknown) dynamics that may differ slightly from the model used for design. This simulates a model-based approach where there is a slight error in the model. The error will lie in the mass of the load, simulating, e.g., that the motor is driving a heavier load than specified. 
+
+We will also design a PID controller ``C`` with a filter for the system, the controller is poorly tuned and not very good at tracking fast reference steps, in practice, one would likely design a feedforward controller as well to improve upon this, but for now we'll stick with the simple feedback controller.
 
 ## System model and controller
 
@@ -55,12 +57,14 @@ end
 # Continuous
 P    = double_mass_model(Jl = 1)
 Pact = double_mass_model(Jl = 1.5) # 50% more load than modeled
-C  = pid(10, 1, 1, form = :series) * tf(1, [0.02, 1])
+C    = pid(10, 1, 1, form = :series) * tf(1, [0.02, 1])
+```
+
+### Discretization
+The system model and controller above are both continuous-time. We discretize them using a sample time of ``T_s = 0.02`` seconds. We also create discrete-time versions of the closed-loop system fom reference ``r`` to output ``y``, ``G_r``, and from plant input ``u`` to output, ``G_u``. Forming closed-loop systems is done using the `feedback` function, which takes the direct path between input and output as the first argument and the feedback path as the second argument (defaults to 1 if omitted). The call `feedback(P*C)` thus forms the transfer function ``PC / (1 + PC)`` while `feedback(P, C)` forms the transfer function ``P / (1 + PC)``.
+```@example HEURISTIC_ILC
+
 Ts = 0.02 # Sample time
-z = tf("z", Ts)
-
-
-# Discrete
 Gr = c2d(feedback(P*C), Ts)       |> tf
 Gu = c2d(feedback(P, C), Ts)
 Gract = c2d(feedback(Pact*C), Ts)
@@ -68,14 +72,7 @@ Guact = c2d(feedback(Pact, C), Ts)
 
 bodeplot([Gr, Gract], lab=["G model" "G actual"], plotphase=false)
 ```
-We will design a PID controller with a filter for the system, the controller is poorly tuned and not very good at tracking fast reference steps, in practice, one would likely design a feedforward controller as well to improve upon this, but for now we'll stick with the simple feedback controller.
-
-```@example HEURISTIC_ILC
-C  = pid(10, 1, 1, form = :series) * tf(1, [0.02, 1])
-Ts = 0.02 # Sample time
-plot(step(Gr, 10), title="Closed-loop step response", lab="model")
-plot!(step(Gract, 10), lab="actual")
-```
+The Bode plot above shows the closed-loop transfer function from reference ``r`` to output ``y``, both using the model `P` and the "actual" plant `Pact`.
 
 ## Reference trajectory
 
@@ -83,10 +80,11 @@ Next up we design a reference trajectory and simulate the actual closed-loop dyn
 ```@example HEURISTIC_ILC
 T = 3pi    # Duration
 t = 0:Ts:T # Time vector
-function funnysin(x)
-    x = sin(x)
+function funnysin(t)
+    x = sin(t)
     s,a = sign(x), abs(x)
-    s*((a + 0.01)^0.2 - 0.01^0.2)
+    y = s*((a + 0.01)^0.2 - 0.01^0.2)
+    t > 2π ? sign(y) : y
 end
 r = funnysin.(t)' |> Array # Reference signal
 

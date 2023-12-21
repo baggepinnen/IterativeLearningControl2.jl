@@ -317,7 +317,7 @@ end
 
 
 """
-    ConstrainedILC(; Q, R, U, Y, Gr_constraints, Gu_constraints, opt, verbose=false, α)
+    ConstrainedILC(; Q, R, A, Y, Gr_constraints, Gu_constraints, opt, verbose=false, α)
 
 Constrained ILC algorithm from the paper "On Robustness in Optimization-Based Constrained Iterative Learning Control", Liao-McPherson and friends.
 
@@ -328,7 +328,7 @@ Supports MIMO systems.
 # Fields:
 - `Q`: Error penalty matrix, e.g., `Q = I(ny)`
 - `R`: Feedforward penalty matrix, e.g., `R = I(nu)`
-- `U`: A function of `(model, a)` that adds constraints to the optimization problem. `a` is a size `(nu, N)` matrix of optimization variables that determines the optimized ILC input. See example below. 
+- `A`: A function of `(model, a)` that adds constraints to the optimization problem. `a` is a size `(nu, N)` matrix of optimization variables that determines the optimized ILC input. See example below. 
 - `Y`: A function of `(model, yh)` that adds constraints to the optimization problem. `yh` is a size `(ny, N)` matrix of predicted plant outputs. See example below
 - `opt`: A JuMP-compatible optimizer, e.g., `OSQP.Optimizer`
 - `α`: Step size, should be smaller than 2. Smaller step sizes lead to more robust progress but slower convergence. Use a small step size if the model is highly uncertain.
@@ -345,7 +345,7 @@ using IterativeLearningControl, OSQP, JuMP, BlockArrays, ControlSystemsBase
 Q = 1000I(Gr.ny)
 R = 0.001I(Gu.nu)
 
-U = function (model, a) # Constrain the ILC input to the range [-25, 25]
+A = function (model, a) # Constrain the ILC input to the range [-25, 25]
     l,u = (-25ones(Gu.nu), 25ones(Gu.nu))
     JuMP.@constraint(model, [i=1:size(a, 2)], l .<= a[:, i] .<= u)
 end
@@ -355,7 +355,7 @@ Y = function (model, yh) # Constrain the predicted output to the range [-1.1, 1.
     JuMP.@constraint(model, [i=1:size(yh, 2)], l .<= yh[:, i] .<= u)
 end
 
-alg = ConstrainedILC(; Q, R, U, Y, opt=OSQP.Optimizer, verbose=true, α=1)
+alg = ConstrainedILC(; Q, R, A, Y, opt=OSQP.Optimizer, verbose=true, α=1)
 ```
 
 To constrain the total plant input, i.e., the sum of the ILC feedforward and the output of the feedback controller, add outputs corresponding to this signal to the models `Gr, Gu`, for example
@@ -368,7 +368,7 @@ and constrain this output in the function `Y` above.
 @kwdef struct ConstrainedILC <: ILCAlgorithm
     Q
     R
-    U = nothing
+    A = nothing
     Y = nothing
     Gr_constraints = nothing
     Gu_constraints = nothing

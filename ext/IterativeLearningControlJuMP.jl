@@ -16,7 +16,7 @@ function mv_hankel_operator(sys::LTISystem{<:Discrete}, N::Int)
 end
 
 function compute_input(alg::ConstrainedILC, workspace, a, e)
-    (; U, Y, verbose, opt) = alg
+    (; A, Y, verbose, opt) = alg
     (; w, Mz, Mv, W, Q, R) = workspace
 
     α = something(alg.α, workspace.α)
@@ -25,7 +25,7 @@ function compute_input(alg::ConstrainedILC, workspace, a, e)
     model = JuMP.Model(opt)
     JuMP.set_optimizer_attribute(model, JuMP.MOI.Silent(), !verbose)
     JuMP.@variable(model, v[i=1:size(a,1), j=1:size(a,2)])
-    U !== nothing && U(model, v)
+    A !== nothing && A(model, v)
     eu = hv(v .- a)
     F̄ = Mz'Q*hv(-e) + R*hv(a)
 
