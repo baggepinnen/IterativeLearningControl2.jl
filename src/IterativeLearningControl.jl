@@ -55,8 +55,8 @@ end
 A structure representing the solution to an ILC problem. 
 
 # Fields:
-- `Y`: Plant responses. `Y[i]` is the response during the `i`th iteration
-- `E`: Errors. `E[i]` is the error during the `i`th iteration
+- `Y`: Plant responses. `Y[i]` is the response during the `i`th iteration. The first response is recorded before any ILC input is applied, while the last response is recorded *before* the last ILC adjustment signal has been computed, i.e., `Y[end]` corresponds to the response to the ILC input `A[end-1]`.
+- `E`: Errors. `E[i]` is the error during the `i`th iteration, i.e., `E[i] = r - Y[i]` where `r` is the reference signal.
 - `A`: ILC inputs. `A[i]` is the ILC input during the `i`th iteration.
 - `prob`: The `ILCProblem` that was solved
 - `alg`: The `ILCAlgorithm` that was used
@@ -73,8 +73,8 @@ end
     ILCProblem
 
 # Fields:
-- `r`: Reference signal
-- `Gr`: Closed-loop transfer function from reference to output
+- `r`: Reference signal, a matrix of size `(ny, N)` where `ny` is the number of outputs and `N` is the number of time points.
+- `Gr`: Closed-loop transfer function from reference to output. May be either an `LTISystem` model from ControlSystemsBase, such as those created using `tf` or `ss`, or an [`LTVSystem`](@ref) model.
 - `Gu`: Closed-loop transfer function from plant input to output
 """
 struct ILCProblem

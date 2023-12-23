@@ -41,7 +41,7 @@ Each algorithm has an associated documentation page available from the menu on t
 
 ### Comments
 - The 🔶 used for [`HeuristicILC`](@ref) indicates that the learning filters may be optionally chosen in a model-based way, but heuristic choices are also possible.
-- Many algorithms can be made to work for time varying and/or nonlinear systems by considering linearizations around the last recorded trajectory. Support for this is not quite implemented yet.
+- Most algorithms work for time varying and/or nonlinear systems by considering linearizations around the last recorded trajectory. 
 - The gradient-based algorithms, like [`GradientILC`](@ref) and [`ModelFreeILC`](@ref) can easily be modified to include a penalty on the size of the adjustment signal ``a``.
 - All algorithms can be trivially modified to add the ``Q`` filter present in [`HeuristicILC`](@ref) in order to improve robustness to measurement noise and model errors.
 

@@ -17,6 +17,7 @@ makedocs(
                   "ModelFreeILC" => "ModelFreeILC.md",
             ],
             "Manual ILC iterations" => "manual.md",
+            "Nonlinear and time-varying systems" => "non_lti.md",
             "API" => "api.md",
       ],
       format = Documenter.HTML(prettyurls = haskey(ENV, "CI")),

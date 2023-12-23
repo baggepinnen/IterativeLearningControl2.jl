@@ -12,6 +12,19 @@ struct LTVSystem{T, N} <: AbstractSystem
     Ts::Float64
 end
 
+
+"""
+    LTVSystem(A::Array{T, 3}, B::Array{T, 3}, C::Array{T, 3}, D::Array{T, 3}, Ts)
+
+Construct a time-varying system from the state-space matrices `A`, `B`, `C`, `D` and sampling time `Ts`.
+
+# Arguments:
+- `A`: A matrix of size `(nx, nx, N)` where `nx` is the state dimension and `N` is the number of time points.
+- `B`: A matrix of size `(nx, nu, N)` where `nu` is the number of inputs.
+- `C`: A matrix of size `(ny, nx, N)` where `ny` is the number of outputs.
+- `D`: A matrix of size `(ny, nu, N)`.
+- `Ts`: The sampling time.
+"""
 LTVSystem(A::Array{T,3},B::Array{T,3},C::Array{T,3},D::Array{T,3},Ts) where T =
     LTVSystem{T, size(A, 3)}(A, B, C, D, Ts)
 
@@ -30,8 +43,12 @@ function Base.getproperty(sys::LTVSystem{<:Any, N}, s::Symbol) where N
     end
 end
 
+"""
+    LTVSystem(syss::Vector{StateSpace{Discrete}})
 
-function LTVSystem(syss::Vector{<:LTISystem{<:Discrete}})
+Construct a time-varying system from a vector of LTI statspace models.
+"""
+function LTVSystem(syss::Vector{<:AbstractStateSpace{<:Discrete}})
     N = length(syss)
     (; nx, nu, ny) = syss[1]
     T = numeric_type(syss[1])
@@ -144,11 +161,32 @@ function tcat(s1::LTVSystem{T,N1}, s2::LTVSystem{T,N2}) where {T,N1,N2}
     LTVSystem{T, N1+N2}(cat(s1.A, s2.A, dims=3), cat(s1.B, s2.B, dims=3), cat(s1.C, s2.C, dims=3), cat(s1.D, s2.D, dims=3), s1.Ts)
 end
 
+"""
+    NonlinearSystem{F, G}
+
+A model representation for a discrete-time nonlinear systems on the form
+```math
+\\begin{align}
+x_{k+1} &= f(x_k, a_k, r_k, p, t) \\\\
+y_k &= g(x_k, a_k, r_k, p, t)
+\\end{align}
+```
+where `x` is the state, `a` is ILC adjustment signal, `r` is the reference, `p` is a parameter vector and `t` is the time.
+
+If you have continuous-time dynamics it must be discretized first, see, e.g., the package [SeeToDee.jl](https://github.com/baggepinnen/SeeToDee.jl) for options.
+
+# Fields:
+- `f::F`: The dynamics function
+- `g::G`: The output function
+- `nx::Int`: The number of state variables
+- `ny::Int`: The number of outputs
+- `na::Int`: The number of ILC adjustment inputs
+- `Ts::Float64`: The sample time
+"""
 @kwdef struct NonlinearSystem{F, G}
     f::F
     g::G
     nx::Int
-    nu::Int
     ny::Int
     na::Int
     Ts::Float64
@@ -156,6 +194,20 @@ end
 
 nadjustment(sys::NonlinearSystem) = sys.na
 
+"""
+    linearize(m::NonlinearSystem, x0::AbstractVector, a0::AbstractVector, args...)
+
+Linearize a nonlinear system `m` around the operating point `(x0, a0)`.
+
+# Arguments
+- `m::NonlinearSystem`: The nonlinear system to be linearized.
+- `x0::AbstractVector`: The operating point of the state variables.
+- `a0::AbstractVector`: The operating point of the ILC input variables.
+- `args...`: Additional arguments to be passed to the dynamics functions (such as `r, p, t`).
+
+# Returns
+An instance of `ControlSystemsBase.StateSpace` representing the linearized system.
+"""
 function linearize(m::NonlinearSystem, x0::AbstractVector, u0::AbstractVector, args...)
     A, B = linearize(m.f, x0, u0, args...)
     C, D = linearize(m.g, x0, u0, args...)
@@ -168,16 +220,29 @@ function linearize!(f, A, B, va::AbstractVector, vb::AbstractVector, xi::Abstrac
     A, B
 end
 
+"""
+    linearize(m::NonlinearSystem, x0::AbstractMatrix, a0::AbstractMatrix, r, p)
+
+Linearizes a nonlinear system `m` around the trajectory defined by `x0`, `a0`, `r`, and `p`.
+The resulting linear time-varying (LTV) system is returned.
+
+# Arguments
+- `m::NonlinearSystem`: The nonlinear system to be linearized.
+- `x0::AbstractMatrix`: The state matrix of size `(nx, N)` where `nx` is the number of states and `N` is the number of time points.
+- `a0::AbstractMatrix`: The input matrix of size `(na, N)` where `na` is the number of adjustment inputs.
+- `r`: The reference signal matrix.
+- `p`: The parameter object.
+"""
 function linearize(m::NonlinearSystem, x0::AbstractMatrix, a0::AbstractMatrix, r, p, args...)
-    (; nx, nu, ny) = m
+    (; nx, na, ny) = m
     N = size(x0, 2)
     size(a0, 2) == size(r, 2) == N || error("The length of the input-signal arrays u and r must be equal to the length of the state-signal array x, got $(size(a0, 2)) and $(size(r, 2)) respectively")
-    size(a0, 1) == nu || error("The number of rows in the input-signal array u must be equal to the number of inputs to the system ($(nu))")
+    size(a0, 1) == na || error("The number of rows in the input-signal array u must be equal to the number of inputs to the system ($(nu))")
     size(x0, 1) == nx || error("The number of rows in the state-signal array x must be equal to the state dimension $(sys.nx) in the system")
     A = zeros(nx, nx, N)
-    B = zeros(nx, nu, N)
+    B = zeros(nx, na, N)
     C = zeros(ny, nx, N)
-    D = zeros(ny, nu, N)
+    D = zeros(ny, na, N)
     va = zeros(nx)
     vb = zeros(nx)
     vc = zeros(ny)
@@ -188,20 +253,31 @@ function linearize(m::NonlinearSystem, x0::AbstractMatrix, a0::AbstractMatrix, r
         linearize!(m.g, C[:, :, i], D[:, :, i], vc, vd, x0[:, i], a0[:, i], r[:, i], p, t, args...)
     end
     LTVSystem(A, B, C, D, m.Ts)
-
 end
 
+"""
+    NonlinearILCProblem
+
+A nonlinear version of [`ILCProblem`](@ref)
+
+# Fields:
+- `r`: The reference trajectory, a matrix of size `(ny, N)` where `ny` is the number of outputs and `N` is the number of time points.
+- `model`: An instance of [`NonlinearSystem`](@ref)
+- `x0`: The initial state
+- `p`: An optional parameter object that will be passed to the dynamics
+"""
 @kwdef struct NonlinearILCProblem
     r
     model
     x0
+    p = nothing
 end
 
 nadjustment(prob::NonlinearILCProblem) = nadjustment(prob.model)
 
 # TODO: it seems we have to handle the fact that we have reference inputs as well, i.e., rewrite linearize to such that it expects `f,g` to have the signatures f(x, a, r, p, t)?
 
-function simulate(prob::NonlinearILCProblem, alg, a; p=nothing)
+function simulate(prob::NonlinearILCProblem, alg, a; p=prob.p)
     model = prob.model
     r = prob.r
     (; nx, ny) = model
@@ -224,7 +300,7 @@ function init(prob::NonlinearILCProblem, ::OptimizationILC)
     nothing
 end
 
-function compute_input(prob::NonlinearILCProblem, alg::OptimizationILC, workspace, a, e, p=nothing)
+function compute_input(prob::NonlinearILCProblem, alg::OptimizationILC, workspace, a, e, p=prob.p)
     (; ρ, λ) = alg
     r = prob.r
     traj = simulate(prob, alg, a; p)
@@ -241,7 +317,7 @@ function init(prob::NonlinearILCProblem, ::GradientILC)
     (; model = prob.model)
 end
 
-function compute_input(prob::NonlinearILCProblem, alg::GradientILC, workspace, a, e, p=nothing)
+function compute_input(prob::NonlinearILCProblem, alg::GradientILC, workspace, a, e, p=prob.p)
     β = alg.β
     N = size(a, 2)
     r = prob.r

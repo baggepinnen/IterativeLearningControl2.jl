@@ -151,7 +151,7 @@ end
         JuMP.@constraint(model, [i=1:size(yh, 2)], l .<= yh[:, i] .<= u)
     end
     
-    alg2 = ConstrainedILC(; Q, R, A, Y, opt=OSQP.Optimizer, verbose=true, α=1)
+    alg2 = ConstrainedILC(; Q, R, A, Y, opt=OSQP.Optimizer, verbose=false, α=1)
     sol2 = ilc(prob, alg2)
     plot(sol2)
     ## Look at the total plant input
@@ -305,7 +305,7 @@ end
     @test all(diff(norm.(sol.E)) .< 0)
     @test norm(sol.E[end]) ≈ 4.906366002179874 atol = 1e-2
 
-    alg = ConstrainedILC(; Q=1000I(Gr.ny), R=0.001I(Gu.nu), opt=OSQP.Optimizer, verbose=true, α=1)
+    alg = ConstrainedILC(; Q=1000I(Gr.ny), R=0.001I(Gu.nu), opt=OSQP.Optimizer, verbose=false, α=1)
     sol = ilc(prob, alg; iters=5)
     plot(sol)
     @test all(diff(norm.(sol.E)) .< 0)
@@ -347,7 +347,7 @@ end
     @test all(diff(norm.(sol.E)) .< 0)
     @test norm(sol.E[end]) ≈ 4.933120956585128 atol = 1e-2
 
-    alg = ConstrainedILC(; Q=1000I(Gr.ny), R=0.001I(Gu.nu), opt=OSQP.Optimizer, verbose=true, α=1)
+    alg = ConstrainedILC(; Q=1000I(Gr.ny), R=0.001I(Gu.nu), opt=OSQP.Optimizer, verbose=false, α=1)
     sol = ilc(prob, alg; iters=5)
     plot(sol)
     @test all(diff(norm.(sol.E)) .< 0)
@@ -376,7 +376,7 @@ end
         i = round(Int, t / Ts + 1)
         GrGu.C[:,:,i]*x + GrGu.D[:,:,i]*ra
     end
-    model = NonlinearSystem(; f, g, GrGu.nx, Gu.nu, GrGu.ny, Ts, na=Gu.nu)
+    model = NonlinearSystem(; f, g, GrGu.nx, GrGu.ny, Ts, na=Gu.nu)
 
     prob = ILC.NonlinearILCProblem(; r, model, x0=zeros(model.nx))
     alg = OptimizationILC(; ρ=0.00001, λ=0.0001)
@@ -396,7 +396,7 @@ end
         i = round(Int, t / Ts + 1)
         Gr.C[:,:,i]*x + Gr.D[:,:,i]*ra
     end
-    modelr = NonlinearSystem(; f, g, Gr.nx, Gr.nu, Gr.ny, Ts, na=Gr.nu)
+    modelr = NonlinearSystem(; f, g, Gr.nx, Gr.ny, Ts, na=Gr.nu)
 
     probr = ILC.NonlinearILCProblem(; r, model=modelr, x0=zeros(modelr.nx))
 
