@@ -188,12 +188,24 @@ end
     @test all(diff(norm.(sol.E)) .< 0)
 
     @test norm(sol.E[end]) ≈ 4.940690279813115 atol = 1e-1
-
-
 end
 
 
-
+@testset "ModelFreeILC" begin
+    @info "Testing ModelFreeILC"
+    r = (funnysin.(t)') |> Array
+    prob = ILCProblem(; r, Gr, Gu)
+    actual = ILCProblem(; r, Gr=Gract, Gu=Guact)
+    alg = ModelFreeILC(1, 500)
+    sol = ilc(prob, alg; actual, iters=10)
+    plot(sol)
+    @test all(diff(norm.(sol.E)) .< 0)
+    @test norm(sol.E[end]) ≈ 0.9347317369952786 atol = 1e-2
+    
+    sol2 = ILC.ilc(prob, alg; actual, iters=10, store_all=true)
+    @test length(sol2.Y) == 3length(sol.Y)
+    @test norm(sol2.E[end]) ≈ 0.9347317369952786 atol = 1e-2
+end
 
 
 end
