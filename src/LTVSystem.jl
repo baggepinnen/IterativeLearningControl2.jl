@@ -2,7 +2,7 @@ import ControlSystemsBase: LTISystem, Discrete, Continuous, TimeEvolution, outpu
 import Base: +, -, *, /, ^, hcat, vcat
 using ForwardDiff
 
-export LTVSystem, NonlinearSystem, tcat
+export LTVSystem, NonlinearSystem, tcat, NonlinearILCProblem
 
 struct LTVSystem{T, N} <: AbstractSystem
     A::Array{T, 3}
@@ -11,6 +11,9 @@ struct LTVSystem{T, N} <: AbstractSystem
     D::Array{T, 3}
     Ts::Float64
 end
+
+LTVSystem(A::Array{T,3},B::Array{T,3},C::Array{T,3},D::Array{T,3},Ts) where T =
+    LTVSystem{T, size(A, 3)}(A, B, C, D, Ts)
 
 function Base.getproperty(sys::LTVSystem{<:Any, N}, s::Symbol) where N
     s ∈ fieldnames(typeof(sys)) && return getfield(sys, s)
@@ -46,7 +49,7 @@ function LTVSystem(syss::Vector{<:LTISystem{<:Discrete}})
 end
 
 Base.length(m::LTVSystem{<:Any, N}) where N = N
-
+nadjustment(m::LTVSystem) = m.nu
 Base.getindex(m::LTVSystem, i::Integer) = ss(m.A[:,:,i], m.B[:,:,i], m.C[:,:,i], m.D[:,:,i], m.Ts)
 Base.getindex(m::LTVSystem, i::Integer, j::Integer) = LTVSystem(m.A[i:i, j:j, :], m.B[i:i, j:j, :], m.C[i:i, j:j, :], m.D[i:i, j:j, :], m.Ts)
 Base.size(m::LTVSystem, i::Integer) = size(m.D, i)
@@ -141,14 +144,17 @@ function tcat(s1::LTVSystem{T,N1}, s2::LTVSystem{T,N2}) where {T,N1,N2}
     LTVSystem{T, N1+N2}(cat(s1.A, s2.A, dims=3), cat(s1.B, s2.B, dims=3), cat(s1.C, s2.C, dims=3), cat(s1.D, s2.D, dims=3), s1.Ts)
 end
 
-struct NonlinearSystem{F, G}
+@kwdef struct NonlinearSystem{F, G}
     f::F
     g::G
     nx::Int
     nu::Int
     ny::Int
+    na::Int
     Ts::Float64
 end
+
+nadjustment(sys::NonlinearSystem) = sys.na
 
 function linearize(m::NonlinearSystem, x0::AbstractVector, u0::AbstractVector, args...)
     A, B = linearize(m.f, x0, u0, args...)
@@ -156,49 +162,57 @@ function linearize(m::NonlinearSystem, x0::AbstractVector, u0::AbstractVector, a
     ss(A, B, C, D, m.Ts)
 end
 
-function linearize!(A, B, f, xi::AbstractVector, ui::AbstractVector, args...)
-    ForwardDiff.jacobian!(x -> f(x, ui, args...), A, xi)
-    ForwardDiff.jacobian!(u -> f(xi, u, args...), B, ui)
+function linearize!(f, A, B, va::AbstractVector, vb::AbstractVector, xi::AbstractVector, ui::AbstractVector, args...)
+    ForwardDiff.jacobian!(A, x -> f(x, ui, args...), xi)
+    ForwardDiff.jacobian!(B, u -> f(xi, u, args...), ui)
     A, B
 end
 
-function linearize(m::NonlinearSystem, x0::AbstractMatrix, u0::AbstractMatrix, r, args...)
+function linearize(m::NonlinearSystem, x0::AbstractMatrix, a0::AbstractMatrix, r, p, args...)
     (; nx, nu, ny) = m
     N = size(x0, 2)
-    size(u0, 2) == size(r, 2) == N || error("The length of the input-signal arrays u and r must be equal to the length of the state-signal array x, got $(size(u0, 2)) and $(size(r, 2)) respectively")
-    size(u, 1) == nu || error("The number of rows in the input-signal array u must be equal to the number of inputs to the system ($(nu))")
-    size(x, 1) == nx || error("The number of rows in the state-signal array x must be equal to the state dimension $(sys.nx) in the system")
+    size(a0, 2) == size(r, 2) == N || error("The length of the input-signal arrays u and r must be equal to the length of the state-signal array x, got $(size(a0, 2)) and $(size(r, 2)) respectively")
+    size(a0, 1) == nu || error("The number of rows in the input-signal array u must be equal to the number of inputs to the system ($(nu))")
+    size(x0, 1) == nx || error("The number of rows in the state-signal array x must be equal to the state dimension $(sys.nx) in the system")
     A = zeros(nx, nx, N)
     B = zeros(nx, nu, N)
     C = zeros(ny, nx, N)
     D = zeros(ny, nu, N)
+    va = zeros(nx)
+    vb = zeros(nx)
+    vc = zeros(ny)
+    vd = zeros(ny)
     @views for i = 1:N
-        linearize!(m.f, A[:, :, i], B[:, :, i], x0[:, i], u0[:, i], r[:, i], args...)
-        linearize!(m.g, C[:, :, i], D[:, :, i], x0[:, i], u0[:, i], r[:, i], args...)
+        t = (i-1)*m.Ts
+        linearize!(m.f, A[:, :, i], B[:, :, i], va, vb, x0[:, i], a0[:, i], r[:, i], p, t, args...)
+        linearize!(m.g, C[:, :, i], D[:, :, i], vc, vd, x0[:, i], a0[:, i], r[:, i], p, t, args...)
     end
     LTVSystem(A, B, C, D, m.Ts)
 
 end
 
-struct NonlinearILCProblem
+@kwdef struct NonlinearILCProblem
     r
     model
     x0
 end
 
+nadjustment(prob::NonlinearILCProblem) = nadjustment(prob.model)
+
 # TODO: it seems we have to handle the fact that we have reference inputs as well, i.e., rewrite linearize to such that it expects `f,g` to have the signatures f(x, a, r, p, t)?
 
-function simulate(prob::NonlinearILCProblem, alg, a)
+function simulate(prob::NonlinearILCProblem, alg, a; p=nothing)
     model = prob.model
+    r = prob.r
     (; nx, ny) = model
     N = size(a, 2)
     x = zeros(nx, N)
     y = zeros(ny, N)
     x[:, 1] .= prob.x0
     @views for i = 1:N
-        y[:, i] = model.g(x[:, i], a[:, i], r[:, i], p, t)
+        y[:, i] = model.g(x[:, i], a[:, i], r[:, i], p, (i-1)*model.Ts)
         if i < N
-            x[:, i+1] = model.f(x[:, i], a[:, i], r[:, i], p, t)
+            x[:, i+1] = model.f(x[:, i], a[:, i], r[:, i], p, (i-1)*model.Ts)
         end
     end
     t = range(0, step=model.Ts, length=N)
@@ -206,14 +220,35 @@ function simulate(prob::NonlinearILCProblem, alg, a)
 end
 
 
-function compute_input(prob::NonlinearILCProblem, alg::OptimizationILC, workspace, a, e)
+function init(prob::NonlinearILCProblem, ::OptimizationILC)
+    nothing
+end
+
+function compute_input(prob::NonlinearILCProblem, alg::OptimizationILC, workspace, a, e, p=nothing)
     (; ρ, λ) = alg
-    traj = simulate(prob, alg, a)
-    ltv = linearize(prob.Gu, traj.x, traj.u)
+    r = prob.r
+    traj = simulate(prob, alg, a; p)
+    ltv = linearize(prob.model, traj.x, traj.u, r, p)
     Tu = hankel_operator(ltv)
     
     TTT = Symmetric(Tu'*Tu)
     Q = ((ρ+λ)*I + TTT)\(λ*I + TTT)
     L = (λ*I + TTT)\Tu'
     reshape(Q*(a' + L*hv(e)), reverse(size(a)))'
+end
+
+function init(prob::NonlinearILCProblem, ::GradientILC)
+    (; model = prob.model)
+end
+
+function compute_input(prob::NonlinearILCProblem, alg::GradientILC, workspace, a, e, p=nothing)
+    β = alg.β
+    N = size(a, 2)
+    r = prob.r
+    model = workspace.model
+    traj = simulate(prob, alg, a; p)
+    ltv = linearize(model, traj.x, traj.u, r, p)
+    Tu = hankel_operator(ltv)
+    # TODO: consider implementing this as J'v without forming J explicitly
+    a .+ reshape(β .* Tu' * hv(e), N, size(a, 1))'
 end

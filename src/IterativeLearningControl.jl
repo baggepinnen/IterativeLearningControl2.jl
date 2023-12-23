@@ -35,6 +35,8 @@ function hankel_operator(x,L::Int)
     H
 end
 
+nadjustment(sys::LTISystem) = ControlSystemsBase.ninputs(sys)
+
 """
     hankel(sys::LTISystem{<:Discrete}, N::Int)
 
@@ -80,6 +82,7 @@ struct ILCProblem
     Gr
     Gu
 end
+nadjustment(prob::ILCProblem) = nadjustment(prob.Gu)
 
 
 """
@@ -231,15 +234,15 @@ To manually perform ILC iterations, see the functions
 
 To simulate the effect of plant-model mismatch, one may provide a different instance of the ILCProblem using the `actual` keyword argument which is used to simulate the plant response. The ILC update will be performed using the plant model from `prob`, while simulated data will be acquired from the plant models in the `actual` problem.
 """
-function ilc(prob, alg; iters = 5, actual = prob)
+function ilc(prob, alg; iters = 5, actual = prob, kwargs...)
     workspace = init(prob, alg)
     r = prob.r
-    a = zeros(size(prob.Gu, 2), size(r, 2)) # ILC adjustment signal starts at 0
+    a = zeros(nadjustment(prob), size(r, 2)) # ILC adjustment signal starts at 0
     Y = typeof(r)[]
     E = typeof(r)[]
     A = typeof(r)[]
     for iter = 1:iters
-        res = simulate(actual, alg, a)
+        res = simulate(actual, alg, a; kwargs...)
         y = res.y
         e = r .- y
         a = compute_input(prob, alg, workspace, a, e)
@@ -434,24 +437,24 @@ end
 # TODO: consider adding zero-phase filtering to suppress high-frequency noise in this algorithm
 # TODO: consider extending the cost model with a penalty on control effort. It should be fairly straightforward, i.e., something like multiplying `a` by a number < 1, e.g., 0.99
 
-function ilc(prob, alg::ModelFreeILC; iters = 5, actual = prob, store_all = false)
+function ilc(prob, alg::ModelFreeILC; iters = 5, actual = prob, store_all = false, kwargs...)
     workspace = init(prob, alg)
     (; α, β) = alg
     r = prob.r
     N = size(r, 2)
-    a = zeros(size(prob.Gu, 2), N) # ILC adjustment signal starts at 0
+    a = zeros(nadjustment(prob), N) # ILC adjustment signal starts at 0
     Y = typeof(r)[]
     E = typeof(r)[]
     A = typeof(r)[]
     for iter = 1:iters
 
         # (1)
-        y = simulate(actual, alg, a).y
+        y = simulate(actual, alg, a; kwargs...).y
         e = r .- y
 
         # (2)
         â = repeat(mean(a, dims=2), 1, N)
-        ŷ = simulate(actual, alg, â).y
+        ŷ = simulate(actual, alg, â; kwargs...).y
         if store_all
             push!(A, â)
             push!(Y, ŷ)
@@ -460,7 +463,7 @@ function ilc(prob, alg::ModelFreeILC; iters = 5, actual = prob, store_all = fals
 
         # (3)
         ẽ = α*reverse(e, dims=2) + â
-        ŷe = simulate(actual, alg, ẽ).y
+        ŷe = simulate(actual, alg, ẽ; kwargs...).y
         if store_all
             push!(A, ẽ)
             push!(Y, ŷe)

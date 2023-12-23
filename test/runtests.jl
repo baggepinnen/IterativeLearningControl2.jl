@@ -34,6 +34,20 @@ function funnysin(x)
     s*((a + 0.01)^0.2 - 0.01^0.2)
 end
 
+function centraldiff(v::AbstractMatrix)
+    dv = Base.diff(v, dims=1)/2
+    a1 = [dv[[1],:];dv]
+    a2 = [dv;dv[[end],:]]
+    a1+a2
+end
+
+function centraldiff(v::AbstractVector)
+    dv = Base.diff(v)/2
+    a1 = [dv[1];dv]
+    a2 = [dv;dv[end]]
+    a1+a2
+end
+
 @testset "IterativeLearningControl.jl" begin
 
 
@@ -47,7 +61,7 @@ end
         y2 = (OP*u')'
         @test y ≈ y2
 
-        OP2 = hankel_operator(fill(G, N))
+        OP2 = hankel_operator(LTVSystem(fill(G, N)))
         @test OP ≈ OP2
     end
 
@@ -221,23 +235,11 @@ end
 end
 
 
-end
+
 
 ##
 
-function centraldiff(v::AbstractMatrix)
-    dv = Base.diff(v, dims=1)/2
-    a1 = [dv[[1],:];dv]
-    a2 = [dv;dv[[end],:]]
-    a1+a2
-end
 
-function centraldiff(v::AbstractVector)
-    dv = Base.diff(v)/2
-    a1 = [dv[1];dv]
-    a2 = [dv;dv[end]]
-    a1+a2
-end
 @testset "LTVSystem and MIMO" begin
     @info "Testing LTVSystem and MIMO"
 
@@ -335,6 +337,8 @@ end
     Guact = convert(LTVSystem{Float64, N}, Guact)
     Gu = tcat(Gu, Guact)
 
+    GrGu = [Gr Gu]
+
 
     prob = ILCProblem(; r, Gr, Gu)
     alg = OptimizationILC(; ρ=0.00001, λ=0.0001)
@@ -361,4 +365,52 @@ end
     plot(sol)
     @test all(diff(norm.(sol.E)) .< 0)
     @test norm(sol.E[end]) ≈ 8.158987305624235 atol = 1e-2
+
+    f = function (x, a, r, p, t)
+        ra = [r; a]
+        i = round(Int, t / Ts + 1)
+        GrGu.A[:,:,i]*x + GrGu.B[:,:,i]*ra
+    end
+    g = function (x, a, r, p, t)
+        ra = [r; a]
+        i = round(Int, t / Ts + 1)
+        GrGu.C[:,:,i]*x + GrGu.D[:,:,i]*ra
+    end
+    model = NonlinearSystem(; f, g, GrGu.nx, Gu.nu, GrGu.ny, Ts, na=Gu.nu)
+
+    prob = ILC.NonlinearILCProblem(; r, model, x0=zeros(model.nx))
+    alg = OptimizationILC(; ρ=0.00001, λ=0.0001)
+    sol = ilc(prob, alg; iters=5)
+    plot(sol)
+    @test all(diff(norm.(sol.E)) .< 0)
+    @test norm(sol.E[end]) ≈ 4.933120956585128 atol = 1e-2
+
+
+    f = @views function (x, a, r, p, t)
+        ra = r+a
+        i = round(Int, t / Ts + 1)
+        Gr.A[:,:,i]*x + Gr.B[:,:,i]*ra
+    end
+    g = @views function (x, a, r, p, t)
+        ra = r+a
+        i = round(Int, t / Ts + 1)
+        Gr.C[:,:,i]*x + Gr.D[:,:,i]*ra
+    end
+    modelr = NonlinearSystem(; f, g, Gr.nx, Gr.nu, Gr.ny, Ts, na=Gr.nu)
+
+    probr = ILC.NonlinearILCProblem(; r, model=modelr, x0=zeros(modelr.nx))
+
+    alg = ModelFreeILC(1, 1)
+    sol = ilc(probr, alg; iters=10)
+    plot(sol)
+    @test all(diff(norm.(sol.E)) .< 0)
+    @test norm(sol.E[end]) ≈ 11.162781721731639 atol = 1e-2
+
+    alg = GradientILC(1e-2)
+    probr = ILC.NonlinearILCProblem(; r, model=modelr, x0=zeros(modelr.nx))
+    sol = ilc(probr, alg; iters=10)
+    plot(sol)
+    @test all(diff(norm.(sol.E)) .< 0)
+    @test norm(sol.E[end]) ≈ 8.158987305624235 atol = 1e-2
+end
 end
