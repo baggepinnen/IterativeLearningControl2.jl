@@ -1,8 +1,8 @@
 module IterativeLearningControl
-using ControlSystemsBase, RecipesBase, LinearAlgebra
+using ControlSystemsBase, RecipesBase, LinearAlgebra, Statistics
 
 export ilc,
-    OptimizationILC, HeuristicILC, ConstrainedILC,
+    OptimizationILC, HeuristicILC, ConstrainedILC, ModelFreeILC, GradientILC,
     ILCProblem,
     init, compute_input,
     ilc_theorem
@@ -404,6 +404,114 @@ Use of this function requires the user to manually install and load the packages
 """
 function mv_hankel_operator end
 
+
+
+## Nonlinear
+
+"""
+    ModelFreeILC
+
+A model-free ILC scheme that works for linear, nonlinear systems and time-varying systems. The algorithm is described in the paper "Model-free Gradient Iterative Learning Control for Non-linear Systems" by Huo and friends.
+
+!!! note
+    This algorithm requires three rollouts per ILC iteration and is not yet compatible with [`compute_input`](@ref). When the ILCSolution is plotted, the number of actual rollouts performed is thus three times then number of ILC iterations shown in the plot (unless `store_all=true` in which case the true number of experiments is shown).
+
+
+For non-square MIMO systems, this algorithm can only operate on the reference signal, i.e., with ``G_u = G_r`` in the ILCProblem. This is because the algorithm adds a scaled version of the tracking error to the ILC adjustment signal, and the two must thus be of compatible dimensions.
+
+When this algorithm is used, an additional keyword argument to the function [`ilc`](@ref) is available, `store_all`. If set to `store_all = true`, the returned solution object will contain all intermediate plant responses, errors and ILC inputs. This is useful for debugging and plotting.
+
+See also [`GradientILC`](@ref) for the model-based version of this algorithm. The model-based version only requires a single rollout per iteration.
+
+# Fields:
+- `α`: Perturbation size. An intermediate experiment with ``α e`` as input will be performed to compute the gradient. A value around 1 is a good start.
+- `β`: Step size.
+"""
+@kwdef struct ModelFreeILC
+    α::Float64
+    β::Float64
+end
+# TODO: consider adding zero-phase filtering to suppress high-frequency noise in this algorithm
+# TODO: consider extending the cost model with a penalty on control effort. It should be fairly straightforward, i.e., something like multiplying `a` by a number < 1, e.g., 0.99
+
+function ilc(prob, alg::ModelFreeILC; iters = 5, actual = prob, store_all = false)
+    workspace = init(prob, alg)
+    (; α, β) = alg
+    r = prob.r
+    N = size(r, 2)
+    a = zeros(size(prob.Gu, 2), N) # ILC adjustment signal starts at 0
+    Y = typeof(r)[]
+    E = typeof(r)[]
+    A = typeof(r)[]
+    for iter = 1:iters
+
+        # (1)
+        y = simulate(actual, alg, a).y
+        e = r .- y
+
+        # (2)
+        â = repeat(mean(a, dims=2), 1, N)
+        ŷ = simulate(actual, alg, â).y
+        if store_all
+            push!(A, â)
+            push!(Y, ŷ)
+            push!(E, r .- ŷ)
+        end
+
+        # (3)
+        ẽ = α*reverse(e, dims=2) + â
+        ŷe = simulate(actual, alg, ẽ).y
+        if store_all
+            push!(A, ẽ)
+            push!(Y, ŷe)
+            push!(E, r .- ŷe)
+        end
+
+        # (4)
+        a =  a .+ β/α .* reverse(ŷe - ŷ, dims=2)
+
+        # a = compute_input(prob, alg, workspace, a, e)
+        push!(Y, y)
+        push!(E, e)
+        push!(A, a)
+    end
+    ILCSolution(Y,E,A,prob,alg)
+end
+
+"""
+    GradientILC(β)
+
+A model-based gradient ILC scheme that works for linear or nonlinear systems. The ILC update rule is
+```math
+a_{k+1}(t) = a_k(t) + β H^T e_k(t)
+```
+where `H` is the Jacobian of the plant output w.r.t. ``a`` and `β` is the step size.
+
+For non-square MIMO systems, this algorithm can only operate on the reference signal, i.e., with ``G_u = G_r`` in the ILCProblem. This is because the algorithm adds a scaled version of the tracking error to the ILC adjustment signal, and the two must thus be of compatible dimensions.
+
+A model-free version of this algorithm is implemented in [`ModelFreeILC`](@ref).
+
+# Fields:
+- `β::Float64`: Step size (learning rate)
+"""
+struct GradientILC
+    β::Float64
+end
+# TODO: consider adding zero-phase `Q` filter for more robust learning
+
+function init(prob, alg::GradientILC)
+    (; model = prob.Gu)
+end
+
+function compute_input(prob, alg::GradientILC, workspace, a, e)
+    β = alg.β
+    N = size(a, 2)
+    model = workspace.model
+    # TODO: consider implementing this as J'v without forming J explicitly
+    a .+ reshape(β .* hankel_operator(model, N)' * hv(e), N, size(a, 1))'
+end
+
+include("LTVSystem.jl")
 
 end
 

@@ -207,6 +207,19 @@ end
     @test norm(sol2.E[end]) ≈ 0.9347317369952786 atol = 1e-2
 end
 
+@testset "GradientILC" begin
+    @info "Testing GradientILC"
+    r = (funnysin.(t)') |> Array
+    prob = ILCProblem(; r, Gr, Gu)
+    actual = ILCProblem(; r, Gr=Gract, Gu=Guact)
+    alg = ILC.GradientILC(500)
+    sol = ilc(prob, alg; actual, iters=10)
+    plot(sol)
+    @test all(diff(norm.(sol.E)) .< 0)
+    @test norm(sol.E[end]) ≈ 0.8851911872861579 atol = 1e-2
+
+end
+
 
 end
 

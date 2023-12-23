@@ -13,6 +13,7 @@ makedocs(
                   "HeuristicILC" => "HeuristicILC.md",
                   "OptimizationILC" => "OptimizationILC.md",
                   "ConstrainedILC" => "ConstrainedILC.md",
+                  "GradientILC" => "GradientILC.md",
                   "ModelFreeILC" => "ModelFreeILC.md",
             ],
             "Manual ILC iterations" => "manual.md",
