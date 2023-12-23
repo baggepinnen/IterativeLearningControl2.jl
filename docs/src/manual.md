@@ -9,7 +9,7 @@ To perform ILC on a physical system, we need to repeatedly apply an ILC signal t
 
 The function `workspace = init(prob, alg)` takes the specification of the ILC problem and the chosen algorithm and returns a `workspace` object with problem-specific things the algorithm needs to run. 
 
-The function `a = compute_input(alg, workspace, a, e)` takes the algorithm, the workspace object created by `init`, the previous ILC input signal ``a_k`` and the tracking error ``e = r - y`` and returns a new ILC input signal ``a_{k+1}``.
+The function `a = compute_input(prob, alg, workspace, a, e)` takes the problem, algorithm, the workspace object created by `init`, the previous ILC input signal ``a_k`` and the tracking error ``e = r - y`` and returns a new ILC input signal ``a_{k+1}``.
 
 ## Docstrings
 ```@docs

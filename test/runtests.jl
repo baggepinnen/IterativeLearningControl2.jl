@@ -223,3 +223,142 @@ end
 
 end
 
+##
+
+function centraldiff(v::AbstractMatrix)
+    dv = Base.diff(v, dims=1)/2
+    a1 = [dv[[1],:];dv]
+    a2 = [dv;dv[[end],:]]
+    a1+a2
+end
+
+function centraldiff(v::AbstractVector)
+    dv = Base.diff(v)/2
+    a1 = [dv[1];dv]
+    a2 = [dv;dv[end]]
+    a1+a2
+end
+@testset "LTVSystem and MIMO" begin
+    @info "Testing LTVSystem and MIMO"
+
+    @testset "hankel" begin
+        N = 30
+        u = randn(2, N)
+        syss = LTVSystem([ssrand(2,2,2,Ts=3) for i = 1:N])
+        @test syss.nu == 2
+        @test syss.ny == 2
+        @test syss.nx == 2
+        @test syss.N == N
+        @test syss.Ts == 3
+        OP = hankel_operator(syss)
+        res = lsim(syss, u)
+        y1 = res.y
+        res2 = lsim(syss, u)
+        Y2 = res2.y
+        Y3 = reshape((OP*hv(u)), :, syss.ny)'
+        @test Y2 ≈ Y3
+    end
+
+
+    # Continuous
+    P1    = DemoSystems.double_mass_model(Jl = 1, outputs=1)
+    P    = DemoSystems.double_mass_model(Jl = 1, outputs=1:2)
+    Pact = DemoSystems.double_mass_model(Jl = 1.5, outputs=1:2) # 50% more load than modeled
+
+    
+    C  = [pid(10, 1, 1, form = :series) * tf(1, [0.02, 1]) 0]
+    
+    
+    # Discrete
+    Ts = 0.02 # Sample time
+    Pd = c2d(P, Ts)
+    Pd1 = c2d(P1, Ts)
+    Pdact = c2d(Pact, Ts)
+    Cd = c2d(ss(C), Ts, :tustin)
+    Gr = c2d(feedback(P*C), Ts)
+    Gu = c2d(feedback(P, C), Ts)
+    Gract = c2d(feedback(Pact*C), Ts)
+    Guact = c2d(feedback(Pact, C), Ts)
+
+
+    P2 = LTVSystem([Pd, Pd])
+    P12 = LTVSystem([Pd1, Pd1])
+    @test P2*Cd ≈ LTVSystem(fill(Pd*Cd, 2))
+    @test feedback(P2*Cd) ≈ LTVSystem(fill(feedback(Pd*Cd), 2))
+    @test feedback(P2, Cd) ≈ LTVSystem(fill(feedback(Pd, Cd), 2))
+    @test feedback(Cd, P2) ≈ LTVSystem(fill(feedback(Cd, Pd), 2))
+    @test feedback(P12, P12) ≈ LTVSystem(fill(feedback(Pd1, Pd1), 2))
+
+
+    
+    T = 3pi    # Duration
+    t = 0:Ts:T # Time vector
+    r = funnysin.(t)' |> Array # Reference signal
+    r = [r; centraldiff(r')' ./ Ts]
+
+    prob = ILCProblem(; r, Gr, Gu)
+    alg = OptimizationILC(; ρ=0.00001, λ=0.0001)
+    sol = ilc(prob, alg; iters=5)
+    plot(sol)
+    @test all(diff(norm.(sol.E)) .< 0)
+    @test norm(sol.E[end]) ≈ 4.906366002179874 atol = 1e-2
+
+    alg = ConstrainedILC(; Q=1000I(Gr.ny), R=0.001I(Gu.nu), opt=OSQP.Optimizer, verbose=true, α=1)
+    sol = ilc(prob, alg; iters=5)
+    plot(sol)
+    @test all(diff(norm.(sol.E)) .< 0)
+    @test norm(sol.E[end]) ≈ 4.956076021566923 atol = 1e-2
+
+    alg = ModelFreeILC(1, 1)
+    probr = ILCProblem(; r, Gr, Gu=Gr)
+    sol = ilc(probr, alg; iters=10)
+    plot(sol)
+    @test all(diff(norm.(sol.E)) .< 0)
+    @test norm(sol.E[end]) ≈ 7.7459826918966925 atol = 1e-2
+
+    alg = GradientILC(1e-2)
+    sol = ilc(probr, alg; iters=10)
+    plot(sol)
+    @test all(diff(norm.(sol.E)) .< 0)
+    @test norm(sol.E[end]) ≈ 6.181388606199837 atol = 1e-2
+
+
+
+    # LTV ILC tests
+    N = size(r, 2)
+    r = [r r]
+    Gr = convert(LTVSystem{Float64, N}, Gr)
+    Gract = convert(LTVSystem{Float64, N}, Gract)
+    Gr = tcat(Gr, Gract)
+
+    Gu = convert(LTVSystem{Float64, N}, Gu)
+    Guact = convert(LTVSystem{Float64, N}, Guact)
+    Gu = tcat(Gu, Guact)
+
+
+    prob = ILCProblem(; r, Gr, Gu)
+    alg = OptimizationILC(; ρ=0.00001, λ=0.0001)
+    sol = ilc(prob, alg; iters=5)
+    plot(sol)
+    @test all(diff(norm.(sol.E)) .< 0)
+    @test norm(sol.E[end]) ≈ 4.933120956585128 atol = 1e-2
+
+    alg = ConstrainedILC(; Q=1000I(Gr.ny), R=0.001I(Gu.nu), opt=OSQP.Optimizer, verbose=true, α=1)
+    sol = ilc(prob, alg; iters=5)
+    plot(sol)
+    @test all(diff(norm.(sol.E)) .< 0)
+    @test norm(sol.E[end]) ≈ 5.049410033148527 atol = 1e-2
+
+    alg = ModelFreeILC(1, 1)
+    probr = ILCProblem(; r, Gr, Gu=Gr)
+    sol = ilc(probr, alg; iters=10)
+    plot(sol)
+    @test all(diff(norm.(sol.E)) .< 0)
+    @test norm(sol.E[end]) ≈ 11.162781721731639 atol = 1e-2
+
+    alg = GradientILC(1e-2)
+    sol = ilc(probr, alg; iters=10)
+    plot(sol)
+    @test all(diff(norm.(sol.E)) .< 0)
+    @test norm(sol.E[end]) ≈ 8.158987305624235 atol = 1e-2
+end

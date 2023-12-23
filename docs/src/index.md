@@ -19,12 +19,14 @@ We support the following algorithms:
 ```@setup ALGORITHMS
 using PrettyTables, Markdown
 
-header = ["Algorithm", "Model based", "MIMO", "Cost function", "Constraints", "Computational complexity"]
+header = ["Algorithm", "Model based", "MIMO", "Nonlinear", "Cost function", "Constraints", "Computational complexity", "Experimental complexity"]
 
 data = [
-    "HeuristicILC"        "🔶" "🟥" "🟥" "🟥" "Low 🚀 (filtering)"
-    "OptimizationILC"     "🟢" "🟥" "🟢" "🟥" "Medium 🤔 (matrix factorization)"
-    "ConstrainedILC"      "🟢" "🟢" "🟢" "🟢" "High 🏋️ (quadratic program)"
+    "HeuristicILC"        "🔶" "🟥" "🟥" "🟥" "🟥" "Low (filtering)"    "Low (1)"
+    "OptimizationILC"     "🟢" "🟢" "🟥" "🟢" "🟥" "Mid (Cholesky)"     "Low (1)"
+    "ConstrainedILC"      "🟢" "🟢" "🟥" "🟢" "🟢" "High (QP)"          "Low (1)"
+    "GradientILC"         "🟢" "🟢" "🟢" "🔶" "🟥" "Low"                "Low (1)"
+    "ModelFreeILC"        "🟥" "🟢" "🟢" "🔶" "🟥" "Low"                "High (3)"
 ]
 
 io = IOBuffer()
@@ -35,7 +37,13 @@ tab_algs = String(take!(io)) |> HTML
 tab_algs # hide
 ```
 
-Each algorithm has an associated documentation page available from the menu on the left. The 🔶 used for [`HeuristicILC`](@ref) indicates that the learning filters may be optionally chosen in a model-based way, but heuristic choices are also possible.
+Each algorithm has an associated documentation page available from the menu on the left.
+
+### Comments
+- The 🔶 used for [`HeuristicILC`](@ref) indicates that the learning filters may be optionally chosen in a model-based way, but heuristic choices are also possible.
+- Many algorithms can be made to work for time varying and/or nonlinear systems by considering linearizations around the last recorded trajectory. Support for this is not quite implemented yet.
+- The gradient-based algorithms, like [`GradientILC`](@ref) and [`ModelFreeILC`](@ref) can easily be modified to include a penalty on the size of the adjustment signal ``a``.
+- All algorithms can be trivially modified to add the ``Q`` filter present in [`HeuristicILC`](@ref) in order to improve robustness to measurement noise and model errors.
 
 ## Terminology
 In this documentation, we will refer to the following signals and (discrete-time) transfer functions
@@ -48,5 +56,4 @@ In this documentation, we will refer to the following signals and (discrete-time
 - ``C(z)`` is a feedback controller
 - ``G_r(z)`` is the closed-loop transfer function from ``r`` to ``y``: ``PC / (1 + PC)``
 - ``G_u(z)`` is the closed-loop transfer function from ``u`` to ``y``: ``P / (1 + PC)``
-
 

@@ -169,7 +169,7 @@ function simulate(prob, alg::HeuristicILC, a)
 end
 
 """
-    compute_input(alg::ILCAlgorithm, workspace, a, e)
+    compute_input(prob, alg::ILCAlgorithm, workspace, a, e)
 
 Compute the next ILC input using the learning rule
 
@@ -179,7 +179,7 @@ Compute the next ILC input using the learning rule
 - `a`: Previous ILC input
 - `e`: Error `r - y`
 """
-function compute_input(alg::HeuristicILC, _, a, e)
+function compute_input(prob, alg::HeuristicILC, _, a, e)
     (; Q, L) = alg
     t = range(0, step=Q.Ts, length=size(a, 2))
     Le = lsim_noncausal(L, e, t)
@@ -206,18 +206,18 @@ function OptimizationILC(; ρ=1e-3, λ=1e-3)
     OptimizationILC(ρ, λ)
 end
 
-function init(prob, alg::OptimizationILC)
+function init(prob, ::OptimizationILC)
     (; Tu = hankel_operator(prob.Gu, size(prob.r, 2)))
 end
 
 # TODO: adjust this algorithm to work with MIMO systems
-function compute_input(alg::OptimizationILC, workspace, a, e)
+function compute_input(prob, alg::OptimizationILC, workspace, a, e)
     (; ρ, λ) = alg
     Tu = workspace.Tu
-    TTT = Tu'*Tu
+    TTT = Symmetric(Tu'*Tu)
     Q = ((ρ+λ)*I + TTT)\(λ*I + TTT)
     L = (λ*I + TTT)\Tu'
-    (Q*(a' + L*e'))'
+    reshape(Q*(a' + L*hv(e)), reverse(size(a)))'
 end
 
 """
@@ -242,7 +242,7 @@ function ilc(prob, alg; iters = 5, actual = prob)
         res = simulate(actual, alg, a)
         y = res.y
         e = r .- y
-        a = compute_input(alg, workspace, a, e)
+        a = compute_input(prob, alg, workspace, a, e)
         push!(Y, y)
         push!(E, e)
         push!(A, a)
@@ -517,8 +517,11 @@ end
 
 
 #=
-# TODO: NonlinearILC
-- Linearize the nonlinear model around the reference trajectory. In the presence of a feedback controller, the system shouldn't be too far away from the reference.
+# TODO: 
 - Implement LTV ILC. This can probably be done for all existing algorithms. Filtering is replaced by a time-varying filter. Hankel operators are replaced by LTV hankel operators (page 106 (11) https://slunik.slu.se/kursfiler/TE0010/10095.1213/REG2_ILCReview.pdf)
 - Introduce methods for `simulate`, `lsim_noncausal`, `hankel_operator` that works for LTV systems
+
+
+# Real-world iterations
+Implement a custom RealILCProblem that is passed as `actual`. The `simulate` function for this problem type should carry out the required experiment and return the result.
 =#
