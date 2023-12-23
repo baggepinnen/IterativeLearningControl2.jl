@@ -5,6 +5,9 @@ using Test
 
 using JuMP, BlockArrays, OSQP
 
+using IterativeLearningControl: hv, hankel_operator, mv_hankel_operator
+import IterativeLearningControl as ILC
+
 function double_mass_model(; 
     Jm = 1,   # motor inertia
     Jl = 1,   # load inertia
@@ -39,10 +42,13 @@ end
         G = ssrand(1,1,5,Ts=1)
         N = 30
         u = randn(1, N)
-        OP = IterativeLearningControl.hankel_operator(G, N)
+        OP = hankel_operator(G, N)
         y = lsim(G, u).y
         y2 = (OP*u')'
         @test y ≈ y2
+
+        OP2 = hankel_operator(fill(G, N))
+        @test OP ≈ OP2
     end
 
     @testset "mv hankel operator" begin
@@ -50,7 +56,7 @@ end
         G = ssrand(2,3,5,Ts=1)
         N = 12
         u = randn(G.nu, N)
-        OP = IterativeLearningControl.mv_hankel_operator(G, N)
+        OP = mv_hankel_operator(G, N)
         y = lsim(G, u).y
         y2 = reshape((OP*vec(u')), :, G.ny)'
         @test y ≈ y2

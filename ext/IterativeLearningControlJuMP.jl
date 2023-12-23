@@ -12,10 +12,10 @@ Return a matrix operator ``H`` such that `y == reshape(H*vec(u'), :, sys.ny)'` w
 """
 function mv_hankel_operator(sys::LTISystem{<:Discrete}, N::Int)
     Hs = [hankel_operator(sys[i, j], N) for i in 1:size(sys, 1), j in 1:size(sys, 2)]
-    BlockArrays.mortar(Hs)
+    BlockArrays.mortar(Hs) |> Matrix # Call to Matrix due to https://github.com/JuliaArrays/BlockArrays.jl/issues/325
 end
 
-function compute_input(alg::ConstrainedILC, workspace, a, e)
+function compute_input(prob, alg::ConstrainedILC, workspace, a, e)
     (; A, Y, verbose, opt) = alg
     (; w, Mz, Mv, W, Q, R) = workspace
 
@@ -45,11 +45,11 @@ function init(prob, alg::ConstrainedILC)
     # z denotes performance outputs / controlled outputs, while v denotes constrained outputs
 
     N = size(prob.r, 2)
-    Mz = mv_hankel_operator(prob.Gu, N) |> Matrix # Call to Matrix due to https://github.com/JuliaArrays/BlockArrays.jl/issues/325
+    Mz = hankel_operator(prob.Gu, N)
     if alg.Gu_constraints === nothing
         Mv = Mz # We constrain the same outputs as the performance outputs
     else
-        Mv = mv_hankel_operator(alg.Gu_constraints, N) |> Matrix # We have special constrained outputs
+        Mv = hankel_operator(alg.Gu_constraints, N) # We have special constrained outputs
     end
     QB = kron(I(N), Q)
     RB = kron(I(N), R)

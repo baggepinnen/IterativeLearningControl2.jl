@@ -41,7 +41,7 @@ end
 Return a matrix operator ``H`` such that ``Hu^T = y^T`` where `y = lsim(sys, u)`. ``H`` is a Hankel matrix containing the Markov parameters of the system (scaled impulse response).
 """
 function hankel_operator(sys::LTISystem{<:Discrete}, N::Int)
-    ControlSystemsBase.issiso(sys) || error("System must be SISO")
+    ControlSystemsBase.issiso(sys) || return mv_hankel_operator(sys, N)
     Tf = N*sys.Ts
     imp = impulse(sys, Tf).y[:] .* sys.Ts
     hankel_operator(imp, N)
