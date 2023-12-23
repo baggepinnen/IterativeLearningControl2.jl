@@ -412,5 +412,25 @@ end
     plot(sol)
     @test all(diff(norm.(sol.E)) .< 0)
     @test norm(sol.E[end]) ≈ 8.158987305624235 atol = 1e-2
+
+
+
+    A = function (model, v)
+        l,u = (-35ones(1), 35ones(1))
+        JuMP.@constraint(model, [i=1:size(v, 2)], l .<= v[:, i] .<= u)
+    end
+    
+    Y = function (model, yh)
+        u = [1.1, 5]
+        l = -u
+        JuMP.@constraint(model, [i=1:size(yh, 2)], l .<= yh[:, i] .<= u)
+    end
+    alg = ConstrainedILC(; Q=1000I(model.ny), R=0.001I(model.na), A, Y, opt=OSQP.Optimizer, verbose=false, α=1)
+    sol = ilc(prob, alg; iters=5)
+    plot(sol)
+    @test all(diff(norm.(sol.E)) .< 0)
+    @test norm(sol.E[end]) ≈ 10.337380903140984 atol = 1e-2
+    @test all(-1.11 .<= sol.Y[end][1,:] .<= 1.11)
+    @test all(-35.02 .<= sol.A[end] .<= 35.02)
 end
 end

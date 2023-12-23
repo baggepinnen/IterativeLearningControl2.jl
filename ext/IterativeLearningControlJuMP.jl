@@ -1,7 +1,7 @@
 module IterativeLearningControlJuMP
 using IterativeLearningControl, ControlSystemsBase, JuMP, LinearAlgebra, BlockArrays
 
-import IterativeLearningControl: mv_hankel_operator, hankel_operator, hv, compute_input, init
+import IterativeLearningControl: mv_hankel_operator, hankel_operator, hv, compute_input, init, simulate, linearize
 
 
 
@@ -77,6 +77,56 @@ function init(prob, alg::ConstrainedILC)
         R = RB,
         α,
     )
+end
+
+function init(prob::NonlinearILCProblem, alg::ConstrainedILC)
+    alg.Gu_constraints == alg.Gr_constraints == nothing || error("Nonlinear ILC with constrained outputs differing from the plant output is not yet supported")
+    (; Q, R) = alg
+
+
+    N = size(prob.r, 2)
+    QB = kron(I(N), Q)
+    RB = kron(I(N), R)
+    α = 0.5 # stepsize
+    (;
+        Q = QB,
+        R = RB,
+        α,
+    )
+end
+
+
+
+function compute_input(prob::NonlinearILCProblem, alg::ConstrainedILC, workspace, a, e, p=prob.p)
+    (; A, Y, verbose, opt) = alg
+    (; Q, R) = workspace
+    r = prob.r
+
+    α = something(alg.α, workspace.α)
+    α < 2 || @warn "α = $α is too large, should be < 2" maxlog=1
+
+    model = JuMP.Model(opt)
+    JuMP.set_optimizer_attribute(model, JuMP.MOI.Silent(), !verbose)
+    JuMP.@variable(model, v[i=1:size(a,1), j=1:size(a,2)])
+    A !== nothing && A(model, v)
+    eu = hv(v .- a)
+
+    traj = simulate(prob, alg, a; p)
+    w = hv(traj.y)
+    ltv = linearize(prob.model, traj.x, traj.u, r, p)
+    Mz = hankel_operator(ltv)
+    W = Mz'Q*Mz + R
+    Mv = Mz
+    F̄ = Mz'Q*hv(-e) + R*hv(a)
+
+    JuMP.@objective(model, Min, eu'W*eu + α*(hv(v)'*F̄))
+    yh = reshape(Mv*hv(v) + w, size(a, 2), :)'
+    Y !== nothing && Y(model, yh) # Adds Y constraints
+    JuMP.optimize!(model)
+    vv = JuMP.value.(v)
+    all(isfinite, vv) || error("Solution is not finite, the problem may be infeasible")
+    reshape(vv, size(a, 2), size(a, 1))'
+
 end
 
 end

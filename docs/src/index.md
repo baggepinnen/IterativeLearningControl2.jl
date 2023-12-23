@@ -24,7 +24,7 @@ header = ["Algorithm", "Model based", "MIMO", "Nonlinear", "Cost function", "Con
 data = [
     "HeuristicILC"        "🔶" "🟥" "🟥" "🟥" "🟥" "Low (filtering)"    "Low (1)"
     "OptimizationILC"     "🟢" "🟢" "🟢" "🟢" "🟥" "Mid (Cholesky)"     "Low (1)"
-    "ConstrainedILC"      "🟢" "🟢" "🟥" "🟢" "🟢" "High (QP)"          "Low (1)"
+    "ConstrainedILC"      "🟢" "🟢" "🟢" "🟢" "🟢" "High (QP)"          "Low (1)"
     "GradientILC"         "🟢" "🟢" "🟢" "🔶" "🟥" "Low"                "Low (1)"
     "ModelFreeILC"        "🟥" "🟢" "🟢" "🔶" "🟥" "Low"                "High (3)"
 ]
