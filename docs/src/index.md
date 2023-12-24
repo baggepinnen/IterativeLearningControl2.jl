@@ -57,3 +57,25 @@ In this documentation, we will refer to the following signals and (discrete-time
 - ``G_r(z)`` is the closed-loop transfer function from ``r`` to ``y``: ``PC / (1 + PC)``
 - ``G_u(z)`` is the closed-loop transfer function from ``u`` to ``y``: ``P / (1 + PC)``
 
+## Where to apply the ILC adjustment signal?
+
+The ILC adjustment signal ``a`` can be applied to _any input_, typically either the plant input ``u`` or the reference ``r``. The choice of where to apply the adjustment signal depends on the options afforded by the system to be controlled. 
+
+```
+                a ┌─────┐
+   ┌─────────/─┬──┤ ILC │◄─┐   ◄─── Operates in batch mode
+   │           /  └─────┘  │
+   │           │           │
+   │           │           │
+r  ▼  ┌─────┐  │  ┌─────┐  │
+───+─►│     │u ▼  │     │ y│
+      │  C  ├──+─►│  P  ├──┼─►
+    ┌►│     │     │     │  │
+    │ └─────┘     └─────┘  │
+    │                      │
+    └──────────────────────┘
+```
+Several industrially occuring control systems lack the possibility to directly manipulate the plant input, in which case modifying the reference ``r`` is the only option. In this case, we chose ``G_a = G_r`` since the transfer function from ``a`` to ``y`` is the same as the transfer function from ``r`` to ``y``. A drawback of this approach is that the ILC adjustment signal ``a`` will depend on the controller, and if the controller is changed, the ILC adjustment signal will have to be recomputed. Some of the ILC algorithms make use of models of the system from ``a`` to ``y``, and the controller ``C`` typically reduces the uncertainty present in the model ``P``, _potentially_ making the model-based ILC task easier.
+
+
+If ``a`` is added directly to the plant input ``u``, we have ``G_a = G_u`` and the ILC adjustment is decoupled from the feedback controller. On the other hand, applying an ILC adjustment signal ``a`` to the plant input ``u`` may require additional precautions since any safety logic present in the controller ``C`` may be circumvented.
