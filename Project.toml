@@ -1,7 +1,7 @@
 name = "IterativeLearningControl"
 uuid = "528a9aa3-4044-4660-82a5-c2ef7f1e15dc"
 authors = ["Fredrik Bagge Carlson"]
-version = "1.0.0-DEV"
+version = "0.1.0"
 
 [deps]
 ControlSystemsBase = "aaaaaaaa-a6ca-5380-bf3e-84a91bcd477e"
@@ -18,6 +18,11 @@ JuMP = "4076af6c-e467-56ae-b986-b466b2749572"
 IterativeLearningControlJuMP = ["JuMP", "BlockArrays"]
 
 [compat]
+ControlSystemsBase = "1"
+ForwardDiff = "0.10"
+RecipesBase = "1"
+Statistics = "1"
+LinearAlgebra = "1"
 BlockArrays = "0.16"
 JuMP = "1"
 julia = "1.9"
