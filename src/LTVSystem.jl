@@ -307,7 +307,7 @@ function simulate(prob::NonlinearILCProblem, alg, a; p=prob.p)
 end
 
 
-function init(::NonlinearILCProblem, ::OptimizationILC)
+function init(prob::NonlinearILCProblem, ::OptimizationILC)
     (; nx, na, ny) = prob.model
     N = size(prob.r, 2)
     A = zeros(nx, nx, N)

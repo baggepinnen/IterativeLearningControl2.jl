@@ -407,7 +407,7 @@ end
     @test norm(sol.E[end]) ≈ 11.162781721731639 atol = 1e-2
 
     alg = GradientILC(1e-2)
-    probr = ILC.NonlinearILCProblem2(; r, model=modelr, x0=zeros(modelr.nx))
+    probr = ILC.NonlinearILCProblem(; r, model=modelr, x0=zeros(modelr.nx))
     sol = ilc(probr, alg; iters=10)
     plot(sol)
     @test all(diff(norm.(sol.E)) .< 0)
