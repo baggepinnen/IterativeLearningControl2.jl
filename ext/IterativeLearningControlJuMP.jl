@@ -1,7 +1,7 @@
-module IterativeLearningControlJuMP
-using IterativeLearningControl, ControlSystemsBase, JuMP, LinearAlgebra, BlockArrays
+module IterativeLearningControl2JuMP
+using IterativeLearningControl2, ControlSystemsBase, JuMP, LinearAlgebra, BlockArrays
 
-import IterativeLearningControl: mv_hankel_operator, hankel_operator, hv, compute_input, init, simulate, linearize
+import IterativeLearningControl2: mv_hankel_operator, hankel_operator, hv, compute_input, init, simulate, linearize
 
 
 

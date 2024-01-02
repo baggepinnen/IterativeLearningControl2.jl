@@ -1,4 +1,4 @@
-module IterativeLearningControl
+module IterativeLearningControl2
 using ControlSystemsBase, RecipesBase, LinearAlgebra, Statistics
 
 export ilc,
@@ -341,7 +341,7 @@ Supports MIMO systems.
 
 # Example
 ```
-using IterativeLearningControl, OSQP, JuMP, BlockArrays, ControlSystemsBase
+using IterativeLearningControl2, OSQP, JuMP, BlockArrays, ControlSystemsBase
 
 # Define Gr and Gu
 

@@ -20,7 +20,7 @@ A model-free version of this algorithm exists, see [ModelFreeILC](@ref).
 
 This example mirrors that of [HeuristicILC](@ref), we create the system model and feedback controller here without any explanation, and refer to the [HeuristicILC](@ref) example for those details
 ```@example MODELFREE_ILC
-using IterativeLearningControl, ControlSystemsBase, Plots
+using IterativeLearningControl2, ControlSystemsBase, Plots
 
 function double_mass_model(; 
                 Jm = 1,   # motor inertia

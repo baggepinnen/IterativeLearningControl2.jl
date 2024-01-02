@@ -545,15 +545,15 @@ git-tree-sha1 = "274c38bd733f9d29036d0a73658fff1dc1d3a065"
 uuid = "c8e1da08-722c-5040-9ed9-7db0dc04731e"
 version = "1.9.0"
 
-[[deps.IterativeLearningControl]]
+[[deps.IterativeLearningControl2]]
 deps = ["ControlSystemsBase", "ForwardDiff", "LinearAlgebra", "RecipesBase", "Statistics"]
 path = ".."
 uuid = "528a9aa3-4044-4660-82a5-c2ef7f1e15dc"
 version = "1.0.0-DEV"
 weakdeps = ["BlockArrays", "JuMP"]
 
-    [deps.IterativeLearningControl.extensions]
-    IterativeLearningControlJuMP = ["JuMP", "BlockArrays"]
+    [deps.IterativeLearningControl2.extensions]
+    IterativeLearningControl2JuMP = ["JuMP", "BlockArrays"]
 
 [[deps.IteratorInterfaceExtensions]]
 git-tree-sha1 = "a3f24677c21f5bbe9d2a714f95dcd58337fb2856"

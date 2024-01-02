@@ -1,11 +1,11 @@
 ENV["GKSwstype"] = 322 # workaround for gr segfault on GH actions
 # ENV["GKS_WSTYPE"]=100 # try this if above does not work
-using Documenter, IterativeLearningControl, Plots, ControlSystemsBase, LinearAlgebra, JuMP, BlockArrays, OSQP
+using Documenter, IterativeLearningControl2, Plots, ControlSystemsBase, LinearAlgebra, JuMP, BlockArrays, OSQP
 
 makedocs(
-      sitename = "IterativeLearningControl Documentation",
+      sitename = "IterativeLearningControl2 Documentation",
       doctest = false,
-      modules = [IterativeLearningControl],
+      modules = [IterativeLearningControl2],
       warnonly = [:autodocs_block],
       pages = [
             "Home" => "index.md",
@@ -24,5 +24,5 @@ makedocs(
 )
 
 deploydocs(
-      repo = "github.com/baggepinnen/IterativeLearningControl.jl.git",
+      repo = "github.com/baggepinnen/IterativeLearningControl2.jl.git",
 )

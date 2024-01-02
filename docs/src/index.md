@@ -1,6 +1,6 @@
-# IterativeLearningControl
+# IterativeLearningControl2
 
-[![Build Status](https://github.com/baggepinnen/IterativeLearningControl.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/baggepinnen/IterativeLearningControl.jl/actions/workflows/CI.yml?query=branch%3Amain)
+[![Build Status](https://github.com/baggepinnen/IterativeLearningControl2.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/baggepinnen/IterativeLearningControl2.jl/actions/workflows/CI.yml?query=branch%3Amain)
 
 ## What is ILC?
 

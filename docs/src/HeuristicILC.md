@@ -32,7 +32,7 @@ default(size=(800,800))
 ```
 
 ```@example HEURISTIC_ILC
-using IterativeLearningControl, ControlSystemsBase, Plots
+using IterativeLearningControl2, ControlSystemsBase, Plots
 
 function double_mass_model(; 
                 Jm = 1,   # motor inertia

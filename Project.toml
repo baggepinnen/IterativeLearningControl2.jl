@@ -1,4 +1,4 @@
-name = "IterativeLearningControl"
+name = "IterativeLearningControl2"
 uuid = "528a9aa3-4044-4660-82a5-c2ef7f1e15dc"
 authors = ["Fredrik Bagge Carlson"]
 version = "0.1.0"
@@ -15,7 +15,7 @@ BlockArrays = "8e7c35d0-a365-5155-bbbb-fb81a777f24e"
 JuMP = "4076af6c-e467-56ae-b986-b466b2749572"
 
 [extensions]
-IterativeLearningControlJuMP = ["JuMP", "BlockArrays"]
+IterativeLearningControl2JuMP = ["JuMP", "BlockArrays"]
 
 [compat]
 ControlSystemsBase = "1"

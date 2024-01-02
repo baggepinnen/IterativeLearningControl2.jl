@@ -9,9 +9,9 @@
 
 ```@docs
 ILCProblem
-IterativeLearningControl.ILCSolution
+IterativeLearningControl2.ILCSolution
 ```
 ```@autodocs
-Modules = [IterativeLearningControl]
+Modules = [IterativeLearningControl2]
 Order = [:function]
 ```

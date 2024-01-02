@@ -28,7 +28,7 @@ where the tuning variable ``λ`` is used to control the learning rate, and ``ρ`
 
 This example mirrors that of [HeuristicILC](@ref), we create the system model and feedback controller here without any explanation, and refer to the [HeuristicILC](@ref) example for those details
 ```@example OPTIMIZATION_ILC
-using IterativeLearningControl, ControlSystemsBase, Plots
+using IterativeLearningControl2, ControlSystemsBase, Plots
 
 function double_mass_model(; 
                 Jm = 1,   # motor inertia

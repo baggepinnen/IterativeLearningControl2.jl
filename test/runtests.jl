@@ -1,12 +1,12 @@
-using IterativeLearningControl
+using IterativeLearningControl2
 using ControlSystemsBase, LinearAlgebra
 using Plots
 using Test
 
 using JuMP, BlockArrays, OSQP
 
-using IterativeLearningControl: hv, hankel_operator, mv_hankel_operator
-import IterativeLearningControl as ILC
+using IterativeLearningControl2: hv, hankel_operator, mv_hankel_operator
+import IterativeLearningControl2 as ILC
 
 function double_mass_model(; 
     Jm = 1,   # motor inertia
@@ -48,7 +48,7 @@ function centraldiff(v::AbstractVector)
     a1+a2
 end
 
-@testset "IterativeLearningControl.jl" begin
+@testset "IterativeLearningControl2.jl" begin
 
 
     @testset "hankel operator" begin
@@ -407,7 +407,7 @@ end
     @test norm(sol.E[end]) ≈ 11.162781721731639 atol = 1e-2
 
     alg = GradientILC(1e-2)
-    probr = ILC.NonlinearILCProblem(; r, model=modelr, x0=zeros(modelr.nx))
+    probr = ILC.NonlinearILCProblem2(; r, model=modelr, x0=zeros(modelr.nx))
     sol = ilc(probr, alg; iters=10)
     plot(sol)
     @test all(diff(norm.(sol.E)) .< 0)
