@@ -18,13 +18,13 @@ JuMP = "4076af6c-e467-56ae-b986-b466b2749572"
 IterativeLearningControl2JuMP = ["JuMP", "BlockArrays"]
 
 [compat]
+BlockArrays = "0.16, 1"
 ControlSystemsBase = "1"
 ForwardDiff = "0.10"
+JuMP = "1"
+LinearAlgebra = "1"
 RecipesBase = "1"
 Statistics = "1"
-LinearAlgebra = "1"
-BlockArrays = "0.16"
-JuMP = "1"
 julia = "1.9"
 
 [extras]
