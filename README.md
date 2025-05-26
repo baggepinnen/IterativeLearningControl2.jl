@@ -1,7 +1,6 @@
 # IterativeLearningControl2
 
 [![Build Status](https://github.com/baggepinnen/IterativeLearningControl2.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/baggepinnen/IterativeLearningControl2.jl/actions/workflows/CI.yml?query=branch%3Amain)
-[![Documentation, stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://baggepinnen.github.io/IterativeLearningControl2.jl/stable)
 [![Documentation, latest](https://img.shields.io/badge/docs-latest-blue.svg)](https://baggepinnen.github.io/IterativeLearningControl2.jl/dev)
 
 [Iterative-Learning Control (ILC)](https://slunik.slu.se/kursfiler/TE0010/10095.1213/REG2_ILCReview.pdf) for linear and nonlinear systems.
