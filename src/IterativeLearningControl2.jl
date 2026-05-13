@@ -304,17 +304,56 @@ Plot the stability boundary for the ILC algorithm.
 - `alg`: Containing the filters ``Q`` and ``L``
 - `Gc`: The closed-loop system from ILC signal to output. If `alg.location = :ref`, this is typically given by `feedback(P*C)` while if `alg.location = :input`, this is typically given by `feedback(P, C)`.
 - `Gcact`: If provided, this is the "actual" closed-loop system which may be constructed using a different plant model than `Gc`. This is useful when trying to determine if the filter choises will lead to a robust ILC algorithm. `Gc` may be constructed using, e.g., uncertain parameters, see https://juliacontrol.github.io/RobustAndOptimalControl.jl/dev/uncertainty/ for more details.
+
+Note, the ``Q`` used in the transfer functions is ``Q(z)Q(z^{-1})``, which reflects the fact that ``Q`` is applied in forward-backward mode (zero-phase filtering).
 """
 function ilc_theorem(alg::HeuristicILC, Gc, Gcact=nothing; w=ControlSystemsBase._default_freq_vector(LTISystem[Gc, alg.L, alg.Q], Val(:bode)))
     (; L, Q) = alg
-    fig = bodeplot(LTISystem[inv(Q), (1 - L*Gc)], w, plotphase=false, lab=["Stability boundary \$Q^{-1}\$" "\$1 - LG\$"], c=[:black 1], linestyle=[:dash :solid])
-    fig2 = nyquistplot(Q*(1 - L*Gc), w, unit_circle=true, lab="\$Q(1 - LG)\$", ylims=(-2, 2), xlims=(-2, 2))
+
+    Qtf = Q isa TransferFunction ? Q : tf(Q)
+    QQ = Qtf*z_reflect_tf_poly(Qtf)
+    fig = bodeplot(LTISystem[inv(QQ), (1 - L*Gc)], w, plotphase=false, lab=["Stability boundary \$Q^{-1}\$" "\$1 - LG\$"], c=[:black 1], linestyle=[:dash :solid])
+    fig2 = nyquistplot(QQ*(1 - L*Gc), w, unit_circle=true, lab="\$Q(1 - LG)\$", ylims=(-2, 2), xlims=(-2, 2))
     if Gcact !== nothing
         bodeplot!(fig, (1 - L*Gcact), w, plotphase=false, lab="\$1 - LG\$ actual", c=2, q=1)
-        nyquistplot!(fig2, Q*(1 - L*Gcact), w, lab="\$Q(1 - LG)\$ actual", ylims=(-1.5, 1.5), xlims=(-1.5, 1.5), q=1)
+        nyquistplot!(fig2, QQ*(1 - L*Gcact), w, lab="\$Q(1 - LG)\$ actual", ylims=(-1.5, 1.5), xlims=(-1.5, 1.5), q=1)
     end    
     RecipesBase.plot(fig, fig2)
 end
+
+function z_reflect_tf_poly(Q::TransferFunction{<:Discrete})
+    ControlSystemsBase.issiso(Q) || error("z_reflect_tf_poly currently supports SISO transfer functions only.")
+
+    Polynomial = ControlSystemsBase.Polynomial
+
+    num_Q_poly = numpoly(Q)[1]
+    den_Q_poly = denpoly(Q)[1]
+    num_Q_coeffs = num_Q_poly.coeffs
+    den_Q_coeffs = den_Q_poly.coeffs
+    degree_num_orig = length(num_Q_coeffs) - 1
+    degree_den_orig = length(den_Q_coeffs) - 1
+    num_reflected_poly_coeffs = reverse(num_Q_coeffs)
+    den_reflected_poly_coeffs = reverse(den_Q_coeffs)
+    Q_intermediate = tf(Polynomial(num_reflected_poly_coeffs),
+                        Polynomial(den_reflected_poly_coeffs),
+                        Q.Ts)
+    power_adjustment = degree_den_orig - degree_num_orig
+    if power_adjustment == 0
+        return Q_intermediate
+    else
+        # Form z^k as a transfer function
+        z = tf("z", Q.Ts)
+        if power_adjustment > 0
+            # Multiply by z^power_adjustment
+            return Q_intermediate * z^power_adjustment
+        else # power_adjustment < 0
+            # Multiply by z^power_adjustment = 1 / z^abs(power_adjustment)
+            return Q_intermediate / z^abs(power_adjustment)
+        end
+    end
+end
+
+z_reflect_tf_poly(Q::AbstractStateSpace{<:Discrete}) = z_reflect_tf_poly(tf(Q))
 
 
 
