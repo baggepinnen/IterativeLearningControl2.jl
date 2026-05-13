@@ -124,6 +124,26 @@ end
 
     ilc_theorem(alg1, Gr, tf(Gract))
 
+    @testset "z_reflect_tf_poly" begin
+        wtest = exp10.(range(-2, stop=log10(pi/Ts - 1e-6), length=20))
+        # power_adjustment > 0 (strictly proper)
+        Q_a = c2d(tf(1, [0.05, 1]), Ts)
+        QQ_a = Q_a * ILC.z_reflect_tf_poly(Q_a)
+        Hq_a = vec(freqresp(Q_a, wtest))
+        Hqq_a = vec(freqresp(QQ_a, wtest))
+        @test isapprox(real.(Hqq_a), abs2.(Hq_a); atol=1e-10)
+        @test isapprox(imag.(Hqq_a), zero(real.(Hqq_a)); atol=1e-10)
+        # power_adjustment == 0 (biproper)
+        Q_b = (z - 0.3) / (z - 0.7)
+        QQ_b = Q_b * ILC.z_reflect_tf_poly(Q_b)
+        Hq_b = vec(freqresp(Q_b, wtest))
+        Hqq_b = vec(freqresp(QQ_b, wtest))
+        @test isapprox(real.(Hqq_b), abs2.(Hq_b); atol=1e-10)
+        @test isapprox(imag.(Hqq_b), zero(real.(Hqq_b)); atol=1e-10)
+        # state-space dispatch
+        ilc_theorem(HeuristicILC(ss(Q_a), L1, :ref), Gr, tf(Gract))
+    end
+
 
     ## Test ConstrainedILC with hard step reference
     Q1 = c2d(tf(1, [0.2, 1]), Ts)

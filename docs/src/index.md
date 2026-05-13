@@ -30,7 +30,7 @@ data = [
 ]
 
 io = IOBuffer()
-tab = pretty_table(io, data; header, tf=tf_html_default)
+pretty_table_html_backend(io, data; column_labels=[header])
 tab_algs = String(take!(io)) |> HTML
 ```
 ```@example ALGORITHMS
